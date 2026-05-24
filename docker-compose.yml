@@ -1,0 +1,33 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "${BALLERBURG_FRONTEND_PORT:-9080}:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - ballerburg
+
+  backend:
+    build:
+      context: server
+      dockerfile: ../Dockerfile.backend
+    ports:
+      - "${BALLERBURG_BACKEND_PORT:-9092}:9092"
+    restart: unless-stopped
+    environment:
+      - BALLERBURG_ADMIN_TOKEN=${BALLERBURG_ADMIN_TOKEN:-}
+    volumes:
+      - ballerburg-data:/app/data
+    networks:
+      - ballerburg
+
+networks:
+  ballerburg:
+    driver: bridge
+
+volumes:
+  ballerburg-data:

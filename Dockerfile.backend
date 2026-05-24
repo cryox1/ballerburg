@@ -1,0 +1,15 @@
+FROM golang:1.26-alpine AS builder
+WORKDIR /app
+COPY go.mod ./
+COPY go.sum* ./
+COPY . .
+RUN go mod tidy
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /ballerburg-server .
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
+RUN mkdir -p /app/data
+COPY --from=builder /ballerburg-server /app/ballerburg-server
+EXPOSE 9092
+CMD ["/app/ballerburg-server"]

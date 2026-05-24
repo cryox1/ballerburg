@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ballerburg — Bestenliste</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: #1a0a00;
+  font-family: 'Courier New', monospace;
+  color: #f0d080;
+  padding: 30px 16px 60px;
+}
+#wrap {
+  max-width: 800px;
+  margin: 0 auto;
+}
+h1 {
+  font-size: 2rem;
+  color: #ffd700;
+  text-shadow: 0 0 16px #ff8800;
+  letter-spacing: 0.2em;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.subtitle {
+  text-align: center;
+  color: #a06030;
+  margin-bottom: 28px;
+  letter-spacing: 0.1em;
+}
+h2 {
+  font-size: 1.1rem;
+  color: #ffcc88;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin: 30px 0 10px;
+  border-bottom: 1px solid #553300;
+  padding-bottom: 4px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #2a1400;
+  border: 2px solid #553300;
+}
+th, td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid #3a1d00;
+}
+th {
+  background: #3a1d00;
+  color: #ffcc88;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: none; }
+tr.team-Wirtschaftsinformatik td:first-child::before { content: "\1F4BC  "; }
+tr.team-Informatik td:first-child::before          { content: "\1F4BB  "; }
+tr.team-Sonstiges td:first-child::before           { content: "\1F3F0  "; }
+.rank { color: #ffd700; font-weight: bold; }
+.empty {
+  text-align: center;
+  color: #a06030;
+  padding: 30px;
+  font-style: italic;
+}
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 30px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.btn {
+  background: #553300;
+  color: #ffcc88;
+  border: 2px solid #aa7733;
+  padding: 12px 24px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.btn:hover { background: #774400; }
+#error {
+  text-align: center;
+  color: #ff6666;
+  margin-top: 20px;
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>&#x1F3C6; BESTENLISTE</h1>
+  <div class="subtitle">Fakultäten-Wettkampf</div>
+
+  <h2>Fakultäten</h2>
+  <table id="teams-table">
+    <thead>
+      <tr>
+        <th>Fakultät</th>
+        <th class="num">Siege</th>
+        <th class="num">Niederlagen</th>
+        <th class="num">Quote</th>
+      </tr>
+    </thead>
+    <tbody id="teams-body"></tbody>
+  </table>
+
+  <div id="difficulty-container"></div>
+
+  <h2>Spieler</h2>
+  <table id="players-table">
+    <thead>
+      <tr>
+        <th class="num">#</th>
+        <th>Name</th>
+        <th>Fakultät</th>
+        <th class="num">Siege</th>
+        <th class="num">Niederlagen</th>
+      </tr>
+    </thead>
+    <tbody id="players-body"></tbody>
+  </table>
+
+  <div id="error"></div>
+
+  <div class="actions">
+    <a class="btn" href="index.html">&laquo; Zurück</a>
+    <button class="btn" onclick="loadScoreboard()">Aktualisieren</button>
+    <a class="btn" href="impressum.html">Impressum</a>
+    <a class="btn" href="datenschutz.html">Datenschutz</a>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function pct(wins, losses) {
+  const total = wins + losses;
+  if (total === 0) return '—';
+  return Math.round((wins / total) * 100) + '%';
+}
+
+function renderTeams(teams) {
+  const body = $('teams-body');
+  if (!teams.length) {
+    body.innerHTML = '<tr><td colspan="4" class="empty">Noch keine Daten.</td></tr>';
+    return;
+  }
+  body.innerHTML = teams.map(t =>
+    `<tr class="team-${escapeHtml(t.team)}">` +
+    `<td>${escapeHtml(t.team)}</td>` +
+    `<td class="num">${t.wins}</td>` +
+    `<td class="num">${t.losses}</td>` +
+    `<td class="num">${pct(t.wins, t.losses)}</td>` +
+    `</tr>`
+  ).join('');
+}
+
+function renderPlayers(players) {
+  const body = $('players-body');
+  if (!players.length) {
+    body.innerHTML = '<tr><td colspan="5" class="empty">Noch keine Spieler registriert.</td></tr>';
+    return;
+  }
+  body.innerHTML = players.map((p, i) =>
+    `<tr>` +
+    `<td class="num rank">${i + 1}</td>` +
+    `<td>${escapeHtml(p.name)}</td>` +
+    `<td>${escapeHtml(p.team)}</td>` +
+    `<td class="num">${p.wins}</td>` +
+    `<td class="num">${p.losses}</td>` +
+    `</tr>`
+  ).join('');
+}
+
+function renderDifficulty(difficulties) {
+  const container = $('difficulty-container');
+  const diffLabels = { easy: 'Leicht', medium: 'Mittel', hard: 'Schwer' };
+  if (!difficulties) { container.innerHTML = ''; return; }
+
+  let html = '';
+  for (const diff of ['easy', 'medium', 'hard']) {
+    const list = difficulties[diff] || [];
+    if (!list.length) {
+      html += `<h2>${diffLabels[diff]}</h2>` +
+        `<div class="empty">Noch keine Spiele gegen Computer (${diffLabels[diff]}).</div><br>`;
+      continue;
+    }
+    html += `<h2>${diffLabels[diff]}</h2>` +
+      `<table class="difficulty-table">` +
+      `<thead><tr><th class="num">#</th><th>Name</th><th class="num">Siege</th><th class="num">Niederlagen</th><th class="num">Quote</th></tr></thead>` +
+      `<tbody>${list.map((p, i) =>
+        `<tr>` +
+        `<td class="num rank">${i + 1}</td>` +
+        `<td>${escapeHtml(p.name)}</td>` +
+        `<td class="num">${p.wins}</td>` +
+        `<td class="num">${p.losses}</td>` +
+        `<td class="num">${pct(p.wins, p.losses)}</td>` +
+        `</tr>`
+      ).join('')}</tbody></table>`;
+  }
+  container.innerHTML = html;
+}
+
+async function loadScoreboard() {
+  $('error').textContent = '';
+  try {
+    const r = await fetch('/scoreboard', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    renderTeams(data.teams || []);
+    renderPlayers(data.players || []);
+    renderDifficulty(data.difficulties || null);
+  } catch (e) {
+    $('error').textContent = 'Bestenliste konnte nicht geladen werden: ' + e.message;
+  }
+}
+
+loadScoreboard();
+</script>
+</body>
+</html>

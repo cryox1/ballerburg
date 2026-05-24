@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ballerburg — Battle</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --ui-reserve: 210px;
+  --game-width: min(calc(100vw - 16px), calc((100vh - var(--ui-reserve)) * 16 / 9));
+  --game-width: min(calc(100dvw - 16px), calc((100dvh - var(--ui-reserve)) * 16 / 9));
+}
+html, body { height: 100%; }
+body { background: #1a0a00; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; min-height: 100dvh; font-family: 'Courier New', monospace; color: #f0d080; overflow: hidden; }
+h1 { font-size: clamp(1rem, 2.6cqi, 2rem); letter-spacing: 0.3em; color: #ffd700; text-shadow: 0 0 10px #ff8800; margin-bottom: 4px; }
+#wrapper { display: flex; flex-direction: column; align-items: center; gap: 4px; width: var(--game-width); position: relative; }
+#ui-top { display: flex; flex-direction: column; gap: 4px; width: 100%; container: uitop / inline-size; }
+#canvas-wrap { width: 100%; overflow: hidden; position: relative; }
+#ui-bottom { display: flex; flex-direction: column; gap: 4px; width: 100%; container: uibot / inline-size; }
+#topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; width: 100%; gap: 4px 12px; padding: 0 4px; }
+#code-share { font-size: 0.85rem; color: #ffcc88; }
+#code-share .code { color: #ffd700; font-weight: bold; letter-spacing: 0.25em; font-size: 1.05rem; padding: 2px 8px; border: 1px solid #aa7733; background: #2a1400; }
+#code-share button { background: #2a1400; color: #ffcc88; border: 1px solid #aa7733; padding: 3px 10px; cursor: pointer; font-family: inherit; font-size: 0.8rem; margin-left: 6px; }
+#code-share button:hover { background: #553300; }
+#statusbar { display: flex; flex-wrap: wrap; align-items: stretch; width: 100%; background: #2a1400; border: 2px solid #8b4513; padding: clamp(5px,0.8cqi,14px) clamp(6px,1.2cqi,16px); gap: clamp(4px,1cqi,14px); }
+.player-panel { flex: 1 1 30%; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.player-panel.p2 { align-items: flex-end; text-align: right; }
+.stat-chips { display: flex; flex-wrap: wrap; gap: clamp(4px,0.8cqi,12px); }
+.player-panel.p2 .stat-chips { justify-content: flex-end; }
+.meta-group { flex: 1 1 auto; display: flex; justify-content: center; align-items: center; gap: clamp(8px,1.6cqi,28px); }
+.meta-block { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.stat-label { color: #a06030; font-size: clamp(0.62rem,0.7cqi,0.95rem); text-transform: uppercase; letter-spacing: 0.08em; }
+.stat-value { color: #ffd700; font-weight: bold; font-size: clamp(0.8rem,1.1cqi,1.35rem); white-space: nowrap; }
+#turn-name { white-space: normal; overflow-wrap: anywhere; }
+@container uitop (max-width: 480px) {
+  #statusbar { flex-direction: column; align-items: stretch; }
+  .player-panel, .player-panel.p2 { align-items: center; text-align: center; }
+  .stat-chips, .player-panel.p2 .stat-chips { justify-content: center; }
+}
+.p1color { color: #4488ff; }
+.p2color { color: #ff4444; }
+.you-marker { color: #88ff88; font-weight: bold; }
+#canvas { border: 3px solid #8b4513; display: block; cursor: crosshair; image-rendering: pixelated; width: 100%; height: auto; aspect-ratio: 16 / 9; touch-action: none; will-change: transform; }
+#controls { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; width: 100%; background: #2a1400; border: 2px solid #8b4513; padding: clamp(5px,0.8cqi,12px) clamp(6px,1cqi,14px); gap: clamp(6px,1.2cqi,16px); }
+.ctrl-group { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#controls .ctrl-group { flex: 1 1 240px; max-width: 440px; }
+.ctrl-group label { font-size: clamp(0.66rem,0.85cqi,0.95rem); color: #a06030; white-space: nowrap; min-width: 50px; text-transform: uppercase; letter-spacing: 0.06em; }
+@container uibot (max-width: 480px) {
+  #controls { flex-direction: column; align-items: stretch; }
+  #controls .ctrl-group { flex: none; max-width: none; }
+  #controls button.action-btn { width: 100%; }
+}
+input[type=range] {
+  flex: 1; min-width: 50px; height: 22px; cursor: pointer;
+  -webkit-appearance: none; appearance: none; background: transparent;
+  --fill: 0%;
+}
+input[type=range]:disabled { cursor: not-allowed; opacity: 0.5; }
+input[type=range]::-webkit-slider-runnable-track {
+  height: 8px; border: 1px solid #3a1a00; border-radius: 4px;
+  background: linear-gradient(to right, #b8860b 0%, #ffd700 var(--fill), #1a0a00 var(--fill), #1a0a00 100%);
+  box-shadow: inset 0 2px 3px rgba(0,0,0,0.8), inset 0 -1px 0 rgba(255,200,100,0.05);
+}
+input[type=range]::-moz-range-track {
+  height: 8px; border: 1px solid #3a1a00; border-radius: 4px;
+  background: #1a0a00;
+  box-shadow: inset 0 2px 3px rgba(0,0,0,0.8);
+}
+input[type=range]::-moz-range-progress {
+  height: 8px; border-radius: 4px 0 0 4px;
+  background: linear-gradient(to right, #b8860b, #ffd700);
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px;
+  border-radius: 50%; border: 1px solid #3a1a00;
+  background: radial-gradient(circle at 35% 30%, #fff6c4 0%, #ffd700 35%, #8b6914 90%, #3a2400 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.6), inset 0 -2px 2px rgba(0,0,0,0.3);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+input[type=range]::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%; border: 1px solid #3a1a00;
+  background: radial-gradient(circle at 35% 30%, #fff6c4 0%, #ffd700 35%, #8b6914 90%, #3a2400 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+input[type=range]:hover:not(:disabled)::-webkit-slider-thumb,
+input[type=range]:focus:not(:disabled)::-webkit-slider-thumb {
+  box-shadow: 0 0 8px #ffd700, 0 0 12px rgba(255,180,0,0.5), inset 0 -2px 2px rgba(0,0,0,0.3);
+}
+input[type=range]:hover:not(:disabled)::-moz-range-thumb,
+input[type=range]:focus:not(:disabled)::-moz-range-thumb {
+  box-shadow: 0 0 8px #ffd700, 0 0 12px rgba(255,180,0,0.5);
+}
+input[type=range]:active:not(:disabled)::-webkit-slider-thumb,
+input[type=range]:active:not(:disabled)::-moz-range-thumb { transform: scale(1.1); }
+input[type=range]:focus { outline: none; }
+.ctrl-val { min-width: 30px; text-align: right; color: #ffd700; font-weight: bold; font-size: 0.85rem; }
+button.action-btn { font-family: 'Courier New', monospace; font-weight: bold; letter-spacing: 0.1em; cursor: pointer; text-transform: uppercase; padding: 8px 14px; font-size: clamp(0.74rem, 1.0cqi, 1.15rem); transition: background 0.1s; }
+button.action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+#popup-fire-btn { background: #8b0000; color: #ffd700; border: 2px solid #ff4444; }
+#popup-fire-btn:hover:not(:disabled) { background: #cc0000; }
+#market-btn { background: #004466; color: #7fdfff; border: 2px solid #3399cc; }
+#market-btn:hover:not(:disabled) { background: #006688; }
+#done-btn { background: #553300; color: #ffcc88; border: 2px solid #aa7733; }
+#done-btn:hover:not(:disabled) { background: #774400; }
+#surrender-btn { background: #3d0000; color: #ff8888; border: 2px solid #882222; }
+#surrender-btn:hover:not(:disabled) { background: #660000; }
+select { background: #2a1400; color: #ffd700; border: 2px solid #8b4513; font-family: 'Courier New', monospace; font-size: 0.82rem; padding: 4px 6px; cursor: pointer; }
+#message { font-size: 0.95rem; color: #ffd700; text-shadow: 0 0 8px #ff8800; min-height: 1.3em; text-align: center; }
+.legend { font-size: 0.7rem; color: #a06030; margin-top: 2px; text-align: center; width: 100%; letter-spacing: 0.05em; }
+
+/* Modals */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; flex-direction: column; gap: 20px; z-index: 100; }
+.overlay.active { display: flex; }
+.overlay h2 { font-size: 2.2rem; color: #ffd700; text-shadow: 0 0 20px #ff8800; letter-spacing: 0.2em; }
+.overlay p { font-size: 1rem; color: #f0d080; }
+#restart-btn { background: #8b4513; color: #ffd700; border: 2px solid #ffd700; padding: 12px 40px; font-family: 'Courier New', monospace; font-size: 1.1rem; cursor: pointer; letter-spacing: 0.2em; }
+#restart-btn:hover { background: #a0522d; }
+#market-panel { background: #1a0a00; border: 3px solid #8b4513; padding: 20px 28px; width: min(90vw, 440px); max-height: 80vh; max-height: 80dvh; overflow-y: auto; }
+#market-panel h2 { color: #ffd700; letter-spacing: 0.15em; text-align: center; margin-bottom: 14px; font-size: 1.4rem; }
+#market-wallet { text-align: center; margin-bottom: 14px; font-size: 0.95rem; }
+.market-item { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid #553311; background: #2a1400; margin-bottom: 6px; }
+.market-item .item-label { color: #ffd700; font-weight: bold; font-size: 0.9rem; }
+.market-item .item-desc { color: #a08070; font-size: 0.75rem; display: block; }
+.market-item .item-price { color: #ffcc00; font-weight: bold; min-width: 54px; text-align: right; }
+.market-item button { background: #004400; color: #88ff88; border: 2px solid #00aa44; padding: 5px 12px; font-family: 'Courier New', monospace; font-weight: bold; cursor: pointer; min-width: 70px; }
+.market-item button:hover:not(:disabled) { background: #006600; }
+.market-item button:disabled { opacity: 0.4; cursor: not-allowed; }
+#market-close { display: block; margin: 14px auto 0; background: #331111; color: #ff8888; border: 2px solid #aa4444; padding: 8px 30px; font-family: 'Courier New', monospace; font-weight: bold; cursor: pointer; }
+#intro-panel { background: #1a0a00; border: 3px solid #8b4513; padding: 20px 28px; width: min(90vw, 460px); max-height: 80vh; max-height: 80dvh; overflow-y: auto; }
+#intro-panel h2 { color: #ffd700; letter-spacing: 0.15em; text-align: center; margin-bottom: 16px; font-size: 1.35rem; }
+#intro-panel ul { list-style: none; margin-bottom: 14px; }
+#intro-panel li { color: #f0d080; font-size: 0.92rem; line-height: 1.6; margin-bottom: 10px; padding-left: 18px; position: relative; }
+#intro-panel li::before { content: '\25B8'; position: absolute; left: 0; color: #aa7733; }
+#intro-panel li b { color: #ffd700; }
+.intro-skip { display: flex; align-items: center; gap: 6px; color: #a08060; font-size: 0.8rem; margin-bottom: 14px; cursor: pointer; }
+#intro-close { display: block; margin: 0 auto; background: #8b4513; color: #ffd700; border: 2px solid #ffd700; padding: 10px 36px; font-family: 'Courier New', monospace; font-size: 1rem; font-weight: bold; letter-spacing: 0.2em; cursor: pointer; }
+#intro-close:hover { background: #a0522d; }
+
+/* Tipp-Ticker */
+#tips-ticker { display: flex; align-items: center; width: 100%; background: #3a2400; border: 2px solid #aa7733; overflow: hidden; }
+.ticker-badge { flex: none; background: #8b4513; color: #ffd700; padding: 4px 8px; font-size: 0.72rem; font-weight: bold; letter-spacing: 0.08em; white-space: nowrap; }
+.ticker-viewport { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+#ticker-track { display: inline-block; white-space: nowrap; padding: 4px 0; color: #ffd700; text-shadow: 0 0 8px #ff8800; font-size: 0.82rem; letter-spacing: 0.08em; animation: ticker-scroll 120s linear infinite; }
+@keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { #ticker-track { animation: none; } }
+
+/* Responsive: portrait phone — only viewport-bound bits remain here; bar
+   typography & row/column layout are driven by cqi units + @container rules. */
+@media (max-width: 480px) {
+  :root { --ui-reserve: 180px; }
+  .ctrl-group label { min-width: 38px; }
+  #market-panel { width: min(95vw, 400px); padding: 14px 16px; }
+  .legend { font-size: 0.6rem; }
+  #message { font-size: 0.82rem; }
+  #king-portrait { width: 34px; height: 34px; }
+  #king-portrait svg { width: 26px; height: 26px; }
+  #king-bubble { font-size: 0.72rem; padding: 5px 8px; }
+}
+
+/* Touch targets: coarse pointer (touchscreen) */
+@media (pointer: coarse) {
+  button.action-btn { min-height: 44px; }
+  input[type=range] { height: 32px; }
+  input[type=range]::-webkit-slider-runnable-track,
+  input[type=range]::-moz-range-track,
+  input[type=range]::-moz-range-progress { height: 12px; border-radius: 6px; }
+  input[type=range]::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -7px; }
+  input[type=range]::-moz-range-thumb { width: 24px; height: 24px; }
+  select { padding: 6px 4px; }
+  #cannon-popup-close { padding: 0 10px; font-size: 1.4rem; }
+}
+
+/* Responsive: landscape phone — canvas left, UI sidebar right.
+   The sidebar keeps a guaranteed width (the canvas shrinks to fit) and the
+   #statusbar / #controls inside it auto-stack via their @container rules.
+   Placed AFTER @media(pointer:coarse) so its compact button sizing wins. */
+@media (max-height: 450px) and (orientation: landscape) {
+  :root { --game-width: 100vw; }
+  body { justify-content: flex-start; align-items: stretch; }
+  #wrapper {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(200px, 30vw, 300px);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "canvas ui-top" "canvas ui-bottom";
+    width: 100dvw;
+    height: 100dvh;
+    gap: 0;
+    align-items: stretch;
+  }
+  #canvas-wrap {
+    grid-area: canvas;
+    height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #canvas { width: auto; height: auto; max-width: 100%; max-height: 100dvh; aspect-ratio: 16 / 9; }
+  #ui-top {
+    grid-area: ui-top;
+    gap: 2px;
+    padding: 3px 6px 0;
+    overflow: auto;
+    align-self: start;
+  }
+  #ui-bottom {
+    grid-area: ui-bottom;
+    gap: 2px;
+    padding: 0 6px 3px;
+    overflow: auto;
+  }
+  h1 { letter-spacing: 0.05em; margin-bottom: 0; }
+  #topbar { padding: 0; }
+  #statusbar { padding: 3px 5px; }
+  #controls { padding: 3px 5px; }
+  button.action-btn { min-height: 0; padding: 5px 8px; }
+  .legend { display: none; }
+  #king-dialog { top: 4px; }
+  #king-portrait { width: 30px; height: 30px; }
+  #king-portrait svg { width: 23px; height: 23px; }
+  #king-bubble { font-size: 0.66rem; padding: 4px 7px; line-height: 1.25; }
+}
+
+/* Cannon control popup — floats next to the clicked cannon, leaves it visible */
+#cannon-popup { display: none; position: absolute; background: rgba(26,10,0,0.92); border: 2px solid #8b4513; padding: 8px 10px; z-index: 50; min-width: 220px; max-width: calc(100% - 8px); font-family: 'Courier New', monospace; box-shadow: 0 0 12px rgba(0,0,0,0.6); }
+#cannon-popup.active { display: flex; flex-direction: column; gap: 6px; }
+#cannon-popup-header { display: flex; justify-content: space-between; align-items: center; }
+#cannon-popup-title { color: #ffd700; letter-spacing: 0.1em; font-size: 0.95rem; }
+#cannon-popup-close { background: transparent; color: #ff8888; border: none; font-size: 1.2rem; cursor: pointer; padding: 0 6px; line-height: 1; }
+#cannon-popup-close:hover { color: #ffaaaa; }
+/* King dialog — top-center speech bubble over the canvas.
+   pointer-events:none lets every click/tap pass through to cannons & buttons. */
+#king-dialog {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: flex-start; gap: 6px; z-index: 60;
+  pointer-events: none; max-width: calc(100% - 16px);
+  opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+#king-dialog.active { opacity: 1; visibility: visible; }
+#king-portrait {
+  flex: none; width: 46px; height: 46px;
+  background: #2a1400; border: 2px solid #8b4513;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 10px rgba(0,0,0,0.6);
+}
+#king-portrait svg { width: 36px; height: 36px; display: block; }
+#king-bubble {
+  position: relative; min-width: 0; background: rgba(26,10,0,0.95);
+  border: 2px solid #ffd700; color: #ffd700;
+  padding: 8px 12px; font-size: 0.9rem; line-height: 1.35;
+  text-shadow: 0 0 8px #ff8800; box-shadow: 0 0 14px rgba(0,0,0,0.7);
+  overflow-wrap: break-word;
+}
+#king-bubble::before {
+  content: ''; position: absolute; left: -9px; top: 12px;
+  border-style: solid; border-width: 7px 9px 7px 0;
+  border-color: transparent #ffd700 transparent transparent;
+}
+.legal-links { position: fixed; right: 8px; bottom: 6px; z-index: 20; display: flex; gap: 10px; font-size: 0.68rem; }
+.legal-links a { color: #8b6a45; text-decoration: none; }
+.legal-links a:hover { color: #ffcc88; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div id="overlay" class="overlay">
+  <h2 id="overlay-title"></h2>
+  <p id="overlay-reason"></p>
+  <button id="restart-btn" onclick="restart()">NEUSTART</button>
+</div>
+<div id="intro-overlay" class="overlay">
+  <div id="intro-panel">
+    <h2>&#x1F3F0; SO SPIELST DU &#x1F3F0;</h2>
+    <ul>
+      <li><b>Kanone w&auml;hlen:</b> Klicke eine deiner Kanonen an &mdash; ein Einstellfenster &ouml;ffnet sich.</li>
+      <li><b>Winkel:</b> Flach (20&ndash;30&deg;) schie&szlig;t weit, steil (60&ndash;80&deg;) trifft hinter Mauern.</li>
+      <li><b>Pulver:</b> bestimmt die <b>St&auml;rke</b> des Schusses &mdash; mehr Pulver = mehr Wurfkraft &amp; Reichweite der Kanonenkugel, kostet aber Pulvervorrat.</li>
+      <li><b>FEUER!</b> Triff die gegnerische Burg, bis du in die Thronkammer durchbrichst.</li>
+    </ul>
+    <label class="intro-skip"><input type="checkbox" id="intro-dont-show"> Diese Hilfe nicht mehr anzeigen</label>
+    <button id="intro-close" onclick="closeIntro()">VERSTANDEN</button>
+  </div>
+</div>
+<div id="market-overlay" class="overlay" style="background:rgba(0,0,0,0.85);">
+  <div id="market-panel">
+    <h2>&#x2694; MARKT &#x2694;</h2>
+    <div id="market-wallet"></div>
+    <div id="market-items"></div>
+    <button id="market-close" onclick="closeMarket()">SCHLIESSEN</button>
+  </div>
+</div>
+<div id="wrapper">
+  <div id="ui-top">
+    <div id="topbar">
+      <h1>&#x1F3F0; BALLERBURG &#x1F3F0;</h1>
+      <div id="code-share"></div>
+    </div>
+    <div id="statusbar">
+      <div class="player-panel p1">
+        <span class="stat-label" id="p1-name-label">Spieler 1</span>
+        <div class="stat-chips">
+          <span class="stat-value p1color" id="p1-gold">&#x1F4B0; 0</span>
+          <span class="stat-value p1color" id="p1-powder">&#x1F4A5; 0</span>
+          <span class="stat-value p1color" id="p1-ammo">&#x26AB; 0</span>
+          <span class="stat-value p1color" id="p1-pop">&#x1F465; 0</span>
+        </div>
+      </div>
+      <div class="meta-group">
+        <div class="meta-block"><span class="stat-label">Runde</span><span class="stat-value" id="round-num">1</span></div>
+        <div class="meta-block"><span class="stat-label">Am Zug</span><span class="stat-value" id="turn-name">—</span></div>
+        <div class="meta-block"><span class="stat-label">Wind</span><span class="stat-value" id="wind-val">—</span></div>
+      </div>
+      <div class="player-panel p2">
+        <span class="stat-label" id="p2-name-label">Spieler 2</span>
+        <div class="stat-chips">
+          <span class="stat-value p2color" id="p2-gold">&#x1F4B0; 0</span>
+          <span class="stat-value p2color" id="p2-powder">&#x1F4A5; 0</span>
+          <span class="stat-value p2color" id="p2-ammo">&#x26AB; 0</span>
+          <span class="stat-value p2color" id="p2-pop">&#x1F465; 0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="canvas" width="3200" height="1800"></canvas>
+    <div id="king-dialog">
+      <div id="king-portrait">
+        <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 24 q0 14 10 17 q10 -3 10 -17 z" fill="#e8c89a"/>
+          <path d="M15 30 q9 12 18 0 q-2 11 -9 13 q-7 -2 -9 -13 z" fill="#f0e6d2"/>
+          <circle cx="20" cy="27" r="1.6" fill="#2a1400"/>
+          <circle cx="28" cy="27" r="1.6" fill="#2a1400"/>
+          <rect x="13" y="18" width="22" height="6" fill="#ffd700" stroke="#8b6914" stroke-width="1"/>
+          <path d="M13 18 L13 9 L18 15 L24 7 L30 15 L35 9 L35 18 Z" fill="#ffd700" stroke="#8b6914" stroke-width="1"/>
+          <circle cx="13" cy="9" r="2" fill="#ff4444"/>
+          <circle cx="24" cy="7" r="2.2" fill="#ff4444"/>
+          <circle cx="35" cy="9" r="2" fill="#ff4444"/>
+          <circle cx="24" cy="21" r="1.6" fill="#cc0000"/>
+        </svg>
+      </div>
+      <div id="king-bubble"><span id="king-text"></span></div>
+    </div>
+  </div>
+  <div id="ui-bottom">
+    <div id="controls">
+      <div class="ctrl-group"><label>Steuer</label><input type="range" id="tax-slider" min="0" max="100" value="40"><span class="ctrl-val" id="tax-val">40</span></div>
+      <button id="market-btn" class="action-btn" onclick="openMarket()">&#x2694; MARKT</button>
+      <button id="done-btn" class="action-btn" onclick="doEndTurn()">FERTIG</button>
+      <button id="surrender-btn" class="action-btn" onclick="doSurrender()">AUFGEBEN</button>
+    </div>
+    <div id="message"></div>
+    <div id="tips-ticker">
+      <span class="ticker-badge">&#x1F4FA; TIPP</span>
+      <div class="ticker-viewport"><div id="ticker-track"></div></div>
+    </div>
+    <div id="brick-banner" style="display:none;width:100%;background:#3a2400;border:2px solid #aa7733;padding:6px 10px;color:#ffd700;text-align:center;font-size:0.9rem;letter-spacing:0.05em;"></div>
+    <div class="legend">Setze gekaufte Mauersteine in dein Burgareal, um Mauern zu bauen oder zu reparieren.</div>
+  </div>
+  <div id="cannon-popup">
+    <div id="cannon-popup-header">
+      <span id="cannon-popup-title">Kanone</span>
+      <button id="cannon-popup-close" onclick="closeCannonPopup()">&times;</button>
+    </div>
+    <div class="ctrl-group"><label>Munition</label>
+      <select id="popup-ammo" style="background:#1a0a00;color:#ffd700;border:1px solid #8b4513;padding:2px 4px;font-family:'Courier New',monospace;">
+        <option value="">Normal</option>
+        <option value="shrapnel">Schrapnell</option>
+
+      </select>
+    </div>
+    <div class="ctrl-group"><label>Winkel</label><input type="range" id="popup-angle" min="10" max="89" value="45"><span class="ctrl-val" id="popup-angle-val">45&deg;</span></div>
+    <div class="ctrl-group"><label>Pulver</label><input type="range" id="popup-power" min="5" max="50" value="30"><span class="ctrl-val" id="popup-power-val">30</span></div>
+    <button id="popup-fire-btn" class="action-btn" onclick="doFire()">FEUER!</button>
+  </div>
+</div>
+<div class="legal-links"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a></div>
+<script>
+// ═══ Constants (mirror server) ═══════════════════════════════════════════════
+// W is now per-match (random 2720..3680). Server sends it as state.w; we also
+// derive a fallback from state.terrain.data.length so older snapshots work.
+let W = 3200; const H = 1800;
+function applyMapWidth(state) {
+  if (!state) return;
+  const newW = (typeof state.w === 'number' && state.w > 0)
+    ? state.w
+    : (state.terrain && state.terrain.data ? state.terrain.data.length : W);
+  if (newW !== W) {
+    W = newW;
+    const c = document.getElementById('canvas');
+    if (c && c.width !== W) c.width = W;
+    // Match the visual aspect ratio to the actual W:H so terrain/castles
+    // aren't horizontally squished or stretched when W != 3200.
+    if (c) c.style.aspectRatio = W + ' / ' + H;
+  }
+}
+const SKY_TOP = '#1a0a2e';
+const SKY_BOT = '#3a1a0a';
+const KING_COLOR = '#ffd700';
+const TOWER_SELL_REFUND = 110;
+
+// ═══ DOM helpers ════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const canvas = $('canvas');
+const ctx = canvas.getContext('2d');
+const setMsg = txt => { $('message').textContent = txt; };
+
+// ═══ King dialog ════════════════════════════════════════════════════════════
+// A non-blocking speech bubble that pops up on key game events with funny German
+// guidance for new players. Auto-dismisses after 3s; pointer-events:none in CSS
+// keeps cannons and buttons fully clickable underneath it, wherever it overlaps.
+let _kingTimer = null;
+function kingSay(text) {
+  const dlg = $('king-dialog');
+  if (!dlg) return;
+  $('king-text').textContent = text;
+  dlg.classList.add('active');
+  if (_kingTimer) clearTimeout(_kingTimer);
+  _kingTimer = setTimeout(() => { dlg.classList.remove('active'); _kingTimer = null; }, 6000);
+}
+const KING_LINES = {
+  welcome:    'Willkommen, tapferer Feldherr! Klicke eine Kanone an, stell Winkel & Pulver ein — und dann: FEUER!',
+  cannon:     'Autsch! Eine meiner Kanonen liegt in Schutt und Asche. Nimm die andere — oder hol im MARKT Nachschub!',
+  powder:     'Mein Pulverfass ist leerer als die Schatztruhe nach dem Festmahl! Ab in den MARKT — Pulver kaufen!',
+  ammo:       'Keine Kugeln mehr? Mit bösen Blicken gewinnt man keine Burg! Kauf Munition im MARKT.',
+  firePowder: 'Halt! So viel Pulver hab ich nicht. Dreh den Regler runter — oder kauf Pulver im MARKT.',
+  fireAmmo:   'Womit schießen, Hofnarr? Keine Kugel im Lager! Schnell, in den MARKT!',
+  fireShrap:  'Schrapnell? Fehlanzeige! Wähle normale Munition oder kauf Schrapnell im MARKT.',
+  bricks:     'Meine schöne Mauer — Trümmer! Kauf Mauersteine im MARKT und klicke in dein Burgareal zum Reparieren.',
+  tower:      'Ein Turm ist gefallen! Ohne Förderturm wird das Gold knapp — schütze den Rest deiner Burg!',
+  cheer:      'Volltreffer! Eine Feindkanone weniger. So gefällt mir das — weiter so!',
+  gold:       'Die Schatztruhe gähnt leer. Schraub die Steuer hoch und warte ein paar Runden auf Nachschub.',
+};
+
+// Start-of-game intro modal. Shows once per browser unless dismissed permanently;
+// the king's welcome bubble fires only after the modal is closed, so they don't overlap.
+function showIntroOrWelcome() {
+  if (localStorage.getItem('bb_intro_seen') === '1') { kingSay(KING_LINES.welcome); return; }
+  $('intro-overlay').classList.add('active');
+}
+function closeIntro() {
+  $('intro-overlay').classList.remove('active');
+  if ($('intro-dont-show').checked) localStorage.setItem('bb_intro_seen', '1');
+  kingSay(KING_LINES.welcome);
+}
+
+// Previous-state snapshot, used to detect event transitions in updateUI().
+let kingPrev = null;
+function countBricks(cs) {
+  let n = 0;
+  for (const w of (cs.walls || [])) {
+    for (const b of (w.bricks || [])) if (b) n++;
+  }
+  return n;
+}
+function kingSnapshot(s) {
+  const my = s.castles[myIdx], en = s.castles[1 - myIdx];
+  return {
+    cannons:      (my && my.cannons ? my.cannons.map(c => !!c.alive) : []),
+    enemyCannons: (en && en.cannons ? en.cannons.map(c => !!c.alive) : []),
+    powder: my ? my.powder : 0,
+    ammo:   my ? my.ammo : 0,
+    towers: my && my.towers ? my.towers.filter(t => t.hp > 0).length : 0,
+    bricks: my ? countBricks(my) : 0,
+    gold:   my ? my.gold : 0,
+  };
+}
+// Diff the new state against the last snapshot and pop the highest-priority line.
+function checkKingEvents(s) {
+  if (!s || myIdx == null || !s.castles[myIdx]) return;
+  const snap = kingSnapshot(s);
+  if (s.winner != null) { kingPrev = snap; return; }   // no popups once the game is over
+  if (!kingPrev) { kingPrev = snap; showIntroOrWelcome(); return; }
+  const p = kingPrev;
+  let line = null;
+  if (snap.cannons.some((a, i) => p.cannons[i] === true && a === false)) {
+    line = KING_LINES.cannon;
+  } else if (p.powder >= 5 && snap.powder < 5) {
+    line = KING_LINES.powder;
+  } else if (p.ammo > 0 && snap.ammo === 0) {
+    line = KING_LINES.ammo;
+  } else if (snap.towers < p.towers) {
+    line = KING_LINES.tower;
+  } else if (p.bricks - snap.bricks >= 4) {
+    line = KING_LINES.bricks;
+  } else if (snap.enemyCannons.some((a, i) => p.enemyCannons[i] === true && a === false)) {
+    line = KING_LINES.cheer;
+  } else if (snap.gold < p.gold && snap.gold < 60) {
+    line = KING_LINES.gold;
+  }
+  kingPrev = snap;
+  if (line) kingSay(line);
+}
+
+// ═══ Connection state ═══════════════════════════════════════════════════════
+const params = new URLSearchParams(location.search);
+const playerName = sessionStorage.getItem('bb_game_name') || params.get('name') || '';
+const playerTeam = sessionStorage.getItem('bb_game_team') || params.get('team') || '';
+let lobbyCode = params.get('code') || sessionStorage.getItem('bb_game_code') || '';
+const aiMode = sessionStorage.getItem('bb_game_ai') || params.get('ai') || ''; // '', 'easy', 'medium', 'hard'
+const hasPlayerIdentity = !!(playerName && playerTeam);
+if (!hasPlayerIdentity) {
+  // Missing team is just as fatal as missing name now — bounce back so the
+  // user can pick a Fakultät on index.html.
+  window.location.href = 'index.html?error=' + encodeURIComponent('Bitte Pseudonym und Fakultät wählen.');
+} else {
+  sessionStorage.setItem('bb_game_name', playerName);
+  sessionStorage.setItem('bb_game_team', playerTeam);
+  if (lobbyCode) sessionStorage.setItem('bb_game_code', lobbyCode);
+  if (aiMode) sessionStorage.setItem('bb_game_ai', aiMode);
+}
+
+let ws = null;
+let myIdx = -1;            // 0 or 1 once "hello" arrives
+let serverState = null;    // last GS snapshot from server
+let stars = [];
+let connected = false;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+let activeCannon = -1;     // index of cannon whose popup is open, -1 = none
+
+// ═══ WS ═════════════════════════════════════════════════════════════════════
+function buildWsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  let u = `${proto}//${location.host}/ws?name=${encodeURIComponent(playerName)}` +
+    `&team=${encodeURIComponent(playerTeam)}`;
+  if (lobbyCode) u += `&code=${encodeURIComponent(lobbyCode)}`;
+  else if (aiMode) u += `&ai=${encodeURIComponent(aiMode)}`;
+  return u;
+}
+
+function connectWS() {
+  if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+  setMsg('Verbinde…');
+  ws = new WebSocket(buildWsUrl());
+  ws.onopen = () => {
+    connected = true;
+    reconnectAttempts = 0;
+    setMsg('Verbunden!');
+  };
+  ws.onmessage = (e) => {
+    let m;
+    try { m = JSON.parse(e.data); } catch (_) { return; }
+    if (m.type === 'hello') {
+      lobbyCode = m.code;
+      sessionStorage.setItem('bb_game_code', lobbyCode);
+      myIdx = m.you;
+      serverState = m.state;
+      applyMapWidth(serverState);
+      try {
+        history.replaceState(null, '', aiMode ? 'game.html' : `game.html?code=${encodeURIComponent(lobbyCode)}`);
+      } catch (_) {}
+      updateCodeShare();
+      updateUI();
+    } else if (m.type === 'state') {
+      serverState = m.state;
+      applyMapWidth(serverState);
+      updateUI();
+    } else if (m.type === 'opponent') {
+      setMsg(m.status === 'joined' ? 'Gegner verbunden!' : 'Gegner getrennt.');
+    } else if (m.type === 'error') {
+      setMsg('Fehler: ' + m.error);
+    }
+  };
+  ws.onclose = () => {
+    connected = false;
+    // If we never even completed a handshake on the first try, the server
+    // probably rejected us (bad team / team mismatch / lobby missing).
+    // Probe over plain HTTP to get the error body, then bounce back.
+    if (reconnectAttempts === 0 && !serverState) {
+      probeRejection();
+      return;
+    }
+    if (reconnectAttempts < 5) {
+      reconnectAttempts++;
+      setMsg(`Verbindung getrennt — Versuch ${reconnectAttempts}/5…`);
+      reconnectTimer = setTimeout(connectWS, 1500);
+    } else {
+      setMsg('Verbindung dauerhaft verloren. Seite neu laden.');
+    }
+  };
+  ws.onerror = () => { /* close handler will retry */ };
+}
+
+// probeRejection: GET /ws so the server's pre-upgrade http.Error() is visible.
+// If the response is a 4xx, redirect to index.html with the body as ?error=…
+async function probeRejection() {
+  try {
+    const url = buildWsUrl().replace(/^ws:/, 'http:').replace(/^wss:/, 'https:');
+    const r = await fetch(url, { method: 'GET' });
+    if (r.status >= 400 && r.status < 500) {
+      const txt = (await r.text()).trim() || `Server lehnte ab (${r.status}).`;
+      window.location.href = 'index.html?error=' + encodeURIComponent(txt);
+      return;
+    }
+  } catch (_) { /* fall through to retry */ }
+  reconnectAttempts++;
+  setMsg(`Verbindung getrennt — Versuch ${reconnectAttempts}/5…`);
+  reconnectTimer = setTimeout(connectWS, 1500);
+}
+
+function sendCommand(action, payload) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  ws.send(JSON.stringify({ type: 'command', data: { action, payload: payload || {} } }));
+  return true;
+}
+
+function updateCodeShare() {
+  const div = $('code-share');
+  if (aiMode) { div.textContent = ''; return; }
+  if (!lobbyCode) { div.textContent = ''; return; }
+  div.innerHTML = `Code: <span class="code">${lobbyCode.toUpperCase()}</span>` +
+    `<button onclick="copyCode()">Kopieren</button>`;
+}
+window.copyCode = function () {
+  navigator.clipboard?.writeText(lobbyCode);
+  setMsg('Code kopiert.');
+};
+
+// ═══ UI updates ═════════════════════════════════════════════════════════════
+// When the wind vane is destroyed, mirror the original game's "geschätzt"
+// readout: scale the true wind by a per-turn random factor in [0.5, 1.0] so the
+// player gets a noisy estimate instead of the precise value. Cached on the wind
+// magnitude so it stays stable while a projectile is flying.
+let _windNoiseSeed = null;
+let _windNoiseFactor = 0.75;
+function estimatedWind(w) {
+  if (_windNoiseSeed !== w) {
+    _windNoiseSeed = w;
+    _windNoiseFactor = 0.5 + 0.5 * Math.random();
+  }
+  return w * _windNoiseFactor;
+}
+
+function getWindView(s) {
+  const w = s.wind || 0;
+  // New server path: per-player visibility comes from backend redaction.
+  if (typeof s.windexact === 'boolean') {
+    return { wind: w, exact: s.windexact };
+  }
+  // Backward-compatible fallback for older servers.
+  const myVane = s.castles[myIdx]?.windvane;
+  const exact = !!(myVane && myVane.alive && myVane.owned);
+  return { wind: exact ? w : estimatedWind(w), exact };
+}
+
+function updateUI() {
+  if (!serverState) return;
+  const s = serverState;
+
+  // Player blocks
+  for (let i = 0; i < 2; i++) {
+    const c = s.castles[i];
+    if (!c) continue;
+    const nameEl = $(`p${i+1}-name-label`);
+    let label = s.players[i] || `Spieler ${i+1}`;
+    if (i === myIdx) label = '★ ' + label + ' (Du)';
+    nameEl.textContent = label;
+    $(`p${i+1}-gold`).textContent   = '\u{1F4B0} ' + c.gold;
+    $(`p${i+1}-powder`).textContent = '\u{1F4A5} ' + c.powder;
+    $(`p${i+1}-ammo`).textContent   = '\u{26AB} ' + c.ammo;
+    $(`p${i+1}-pop`).textContent    = '\u{1F465} ' + c.population;
+  }
+
+  $('round-num').textContent = s.round;
+  $('turn-name').textContent = s.players[s.turn] || `Spieler ${s.turn + 1}`;
+
+  const windView = getWindView(s);
+  const shownWind = windView.wind;
+  const wTxt = (shownWind >= 0 ? '→ ' : '← ') + Math.abs(shownWind).toFixed(2) + (windView.exact ? '' : ' ?');
+  $('wind-val').textContent = wTxt;
+
+  const myCs = s.castles[myIdx];
+
+  // Tax slider — sync from server
+  if (myCs && myCs.taxrate != null) {
+    const ts = $('tax-slider');
+    if (document.activeElement !== ts) {
+      ts.value = myCs.taxrate;
+      $('tax-val').textContent = myCs.taxrate;
+      setSliderFill(ts);
+    }
+  }
+
+  const isAim   = s.phase === 'aim';
+  const myTurn  = s.turn === myIdx;
+  const canAct  = isAim && myTurn && s.winner == null;
+  const pending = (myCs && myCs.pendingbricks) || 0;
+  // Fire is locked while bricks are still pending — server enforces too, but
+  // gating the button gives immediate visual feedback.
+  $('market-btn').disabled    = !canAct;
+  $('done-btn').disabled      = !canAct || pending > 0;
+  $('surrender-btn').disabled = !canAct;
+  $('tax-slider').disabled    = !canAct;
+
+  // Cannon popup — auto-close if context no longer permits aiming with this cannon.
+  if (activeCannon >= 0) {
+    const cn = myCs && myCs.cannons && myCs.cannons[activeCannon];
+    if (!canAct || pending > 0 || !cn || !cn.alive) {
+      closeCannonPopup();
+    } else {
+      refreshPopupAmmoOptions(myCs);
+      $('popup-fire-btn').disabled = false;
+      $('popup-angle').disabled    = false;
+      $('popup-power').disabled    = false;
+    }
+  }
+
+  const bb = $('brick-banner');
+  if (pending > 0 && myTurn && isAim) {
+    bb.textContent = `🧱 ${pending} Mauerstein${pending === 1 ? '' : 'e'} setzen — klicke in dein Burgareal.`;
+    bb.style.display = 'block';
+  } else {
+    bb.style.display = 'none';
+  }
+
+  // Keep the cursor in sync with the placement mode — flips back to crosshair
+  // the instant the server reports pendingbricks > 0, even at zoom > 1.
+  if (typeof refreshCanvasCursor === 'function') refreshCanvasCursor();
+
+  checkKingEvents(s);
+
+  if (s.winner != null && s.phase === 'gameover') showGameOver();
+}
+
+// ═══ Action handlers ═══════════════════════════════════════════════════════
+function doFire() {
+  if (!serverState || serverState.turn !== myIdx) return;
+  if (activeCannon < 0) return;
+  const myCs = serverState.castles[myIdx];
+  if (!myCs) return;
+  const cannon = activeCannon;
+  const angle  = parseInt($('popup-angle').value);
+  const power  = parseInt($('popup-power').value);
+  const ammoType = $('popup-ammo').value || '';
+  if (myCs.powder < power) { kingSay(KING_LINES.firePowder); return; }
+  if (!myCs.cannons[cannon]?.alive) { setMsg('Diese Kanone ist zerstört.'); return; }
+  if (ammoType === '' && (myCs.ammo || 0) <= 0)            { kingSay(KING_LINES.fireAmmo); return; }
+  if (ammoType === 'shrapnel' && (myCs.shrapnelammo || 0) <= 0) { kingSay(KING_LINES.fireShrap); return; }
+  setMsg(ammoType === 'shrapnel' ? 'Schrapnell raus!' : 'Feuer frei!');
+  sendCommand('fire', { cannon, angle, power, ammoType });
+  closeCannonPopup();
+}
+
+function doEndTurn() {
+  sendCommand('end_turn', {});
+}
+
+function doSurrender() {
+  if (!serverState || serverState.phase !== 'aim' || serverState.turn !== myIdx) return;
+  const ok = window.confirm('Burg wirklich aufgeben? Der Gegner gewinnt sofort.');
+  if (!ok) return;
+  sendCommand('surrender', {});
+}
+
+function requestTowerSell(idx) {
+  if (!serverState || serverState.phase !== 'aim' || serverState.turn !== myIdx) return;
+  const myCs = serverState.castles[myIdx];
+  if (!myCs || !myCs.towers || !myCs.towers[idx] || myCs.towers[idx].hp <= 0) return;
+  closeCannonPopup();
+  const ok = window.confirm(`Förderturm wirklich verkaufen?\nDu erhältst ${TOWER_SELL_REFUND} Gold zurück.`);
+  if (!ok) return;
+  sendCommand('sell_tower', { index: idx });
+  setMsg(`Förderturm verkauft (+${TOWER_SELL_REFUND} Gold).`);
+  setTimeout(() => { if ($('market-overlay').classList.contains('active')) openMarket(); }, 50);
+}
+
+let taxTimer = null;
+function debouncedTaxSend() {
+  clearTimeout(taxTimer);
+  taxTimer = setTimeout(() => {
+    const tax = parseInt($('tax-slider').value);
+    sendCommand('set_tax', { tax });
+  }, 350);
+}
+
+function setSliderFill(el) {
+  if (!el) return;
+  const min = +el.min, max = +el.max, v = +el.value;
+  const pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
+  el.style.setProperty('--fill', pct + '%');
+}
+$('popup-angle').addEventListener('input', e => { $('popup-angle-val').textContent = e.target.value + '°'; setSliderFill(e.target); });
+$('popup-power').addEventListener('input', e => { $('popup-power-val').textContent = e.target.value; setSliderFill(e.target); });
+$('tax-slider').addEventListener('input', e => { $('tax-val').textContent = e.target.value; setSliderFill(e.target); debouncedTaxSend(); });
+setSliderFill($('popup-angle'));
+setSliderFill($('popup-power'));
+setSliderFill($('tax-slider'));
+
+// Scrolling tips ticker — content inserted twice so the -50% loop is seamless.
+const GAME_TIPS = [
+  'Pulver bestimmt die Wurfkraft der Kanonenkugel — mehr Pulver = mehr Reichweite, kostet aber Vorrat.',
+  'Flacher Winkel (20–30°) schießt weit, steiler Winkel (60–80°) trifft hinter Mauern.',
+  'Der Wind lenkt die Kugel ab — stell die Kanone gegen den Wind ein.',
+  'Kein Pulver mehr? Im MARKT 50× Pulver für 50 Gold nachkaufen.',
+  'Ein Treffer in die feindliche Pulverkammer löst eine Riesenexplosion aus.',
+  'Schrapnell zerstreut sich in 4 Splitter — stark gegen Kanonen und Wetterfahne.',
+  'Moderate Steuern (~40–50 %) halten deine Bevölkerung stabil.',
+  'Förderturm kaufen: +16 Gold pro Runde, lohnt sich nach ~14 Runden (max. 2 Türme).',
+  'Zerstör die gegnerische Wetterfahne — dann kennt der Gegner nur noch ungefähren Wind.',
+  'Repariere beschädigte Mauern mit Mauersteinen aus dem Markt.',
+  'Sieg: Schieß dich durch die Mauern bis in die Thronkammer des Gegners.',
+];
+(function initTicker() {
+  const track = $('ticker-track');
+  if (!track) return;
+  const seq = GAME_TIPS.join('  ★  ') + '  ★  ';
+  track.textContent = seq + seq;
+})();
+
+// ═══ Accurate game-width sizing ══════════════════════════════════════════════
+function updateGameWidth() {
+  // In landscape the CSS grid drives layout; JS only needs to set a full-width value.
+  if (window.innerHeight < 450 && window.innerWidth > window.innerHeight) {
+    document.documentElement.style.setProperty('--game-width', window.innerWidth + 'px');
+    return;
+  }
+  const vw = document.documentElement.clientWidth - 16;
+  const vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  // The real UI reserve is whatever #ui-top + #ui-bottom occupy — measure them
+  // directly (robust to wrapping, the ticker, and any future bar restructuring)
+  // instead of summing individual elements. +8 for the two #wrapper gaps, +6 safety.
+  const measure = () => {
+    const top = document.getElementById('ui-top');
+    const bot = document.getElementById('ui-bottom');
+    const th = top ? top.getBoundingClientRect().height : 0;
+    const bh = bot ? bot.getBoundingClientRect().height : 0;
+    return th + bh + 8 + 6;
+  };
+  // The UI height itself depends on the game width (cqi-scaled fonts + wrapping),
+  // so settle over two passes: size once, let layout react, then finalize.
+  for (let i = 0; i < 2; i++) {
+    const w = Math.max(200, Math.min(vw, (vh - measure()) * 16 / 9));
+    document.documentElement.style.setProperty('--game-width', w + 'px');
+  }
+}
+window.addEventListener('resize', () => {
+  updateGameWidth();
+  if (activeCannon >= 0) closeCannonPopup();
+});
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    updateGameWidth();
+    if (activeCannon >= 0) closeCannonPopup();
+  });
+}
+window.addEventListener('orientationchange', () => { setTimeout(updateGameWidth, 100); });
+requestAnimationFrame(() => requestAnimationFrame(updateGameWidth));
+
+// ═══ Cannon popup ═══════════════════════════════════════════════════════════
+function cannonHitTest(sx, sy, cs) {
+  if (!cs || !cs.cannons) return -1;
+  const R = 40; // generous click radius around the breech
+  let best = -1, bestD = R * R;
+  cs.cannons.forEach((cn, i) => {
+    if (!cn.alive) return;
+    const dx = sx - cn.bx, dy = sy - cn.by;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD) { best = i; bestD = d2; }
+  });
+  return best;
+}
+function towerHitTest(sx, sy, cs) {
+  if (!cs || !cs.towers) return -1;
+  const PAD_X = 10;
+  const PAD_Y_TOP = 26;
+  const PAD_Y_BOT = 8;
+  for (let i = cs.towers.length - 1; i >= 0; i--) {
+    const tw = cs.towers[i];
+    if (!tw || tw.hp <= 0) continue;
+    if (
+      sx >= tw.x - PAD_X && sx <= tw.x + tw.w + PAD_X &&
+      sy >= tw.y - PAD_Y_TOP && sy <= tw.y + tw.h + PAD_Y_BOT
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+function worldToScreen(wx, wy) {
+  const rect = canvas.getBoundingClientRect();
+  const wrapRect = $('wrapper').getBoundingClientRect();
+  const px = rect.left - wrapRect.left + wx * (rect.width  / W);
+  const py = rect.top  - wrapRect.top  + wy * (rect.height / H);
+  return { x: px, y: py };
+}
+function refreshPopupAmmoOptions(cs) {
+  if (!cs) return;
+  const sel = $('popup-ammo');
+  const current = sel.value || '';
+  const counts = { '': cs.ammo || 0, 'shrapnel': cs.shrapnelammo || 0 };
+  const labels = { '': 'Normal', 'shrapnel': 'Schrapnell' };
+  for (const opt of sel.options) {
+    const k = opt.value;
+    opt.text = `${labels[k]} (${counts[k]})`;
+    opt.disabled = counts[k] <= 0;
+  }
+  if (counts[current] > 0) {
+    sel.value = current;
+  } else {
+    sel.value = (counts[''] > 0) ? '' : (counts['shrapnel'] > 0 ? 'shrapnel' : '');
+  }
+}
+function openCannonPopup(idx) {
+  const cs = serverState && serverState.castles[myIdx];
+  if (!cs || !cs.cannons || !cs.cannons[idx] || !cs.cannons[idx].alive) return;
+  activeCannon = idx;
+  const cn = cs.cannons[idx];
+  $('cannon-popup-title').textContent = `Kanone ${idx + 1}`;
+  refreshPopupAmmoOptions(cs);
+  const popup = $('cannon-popup');
+  popup.classList.add('active');
+  setSliderFill($('popup-angle'));
+  setSliderFill($('popup-power'));
+  // Position next to the cannon, on the side facing away from the castle interior.
+  const screenPos = worldToScreen(cn.bx, cn.by);
+  const wrapRect = $('wrapper').getBoundingClientRect();
+  const pw = popup.offsetWidth || 240;
+  const ph = popup.offsetHeight || 160;
+  const gap = 56;
+  let left = cn.side > 0 ? screenPos.x + gap : screenPos.x - pw - gap;
+  let top  = screenPos.y - ph / 2;
+  // Clamp inside the wrapper so the popup never escapes the visible game area.
+  left = Math.max(4, Math.min(left, wrapRect.width  - pw - 4));
+  top  = Math.max(4, Math.min(top,  wrapRect.height - ph - 4));
+  popup.style.left = left + 'px';
+  popup.style.top  = top  + 'px';
+}
+function closeCannonPopup() {
+  activeCannon = -1;
+  $('cannon-popup').classList.remove('active');
+}
+function repositionCannonPopup() {
+  if (activeCannon < 0) return;
+  const cs = serverState && serverState.castles[myIdx];
+  if (!cs || !cs.cannons || !cs.cannons[activeCannon]) return;
+  const cn = cs.cannons[activeCannon];
+  const popup = $('cannon-popup');
+  const screenPos = worldToScreen(cn.bx, cn.by);
+  const wrapRect = $('wrapper').getBoundingClientRect();
+  const pw = popup.offsetWidth || 240;
+  const ph = popup.offsetHeight || 160;
+  const gap = 56;
+  let left = cn.side > 0 ? screenPos.x + gap : screenPos.x - pw - gap;
+  let top  = screenPos.y - ph / 2;
+  left = Math.max(4, Math.min(left, wrapRect.width  - pw - 4));
+  top  = Math.max(4, Math.min(top,  wrapRect.height - ph - 4));
+  popup.style.left = left + 'px';
+  popup.style.top  = top  + 'px';
+}
+
+// ═══ Zoom / Pan ══════════════════════════════════════════════════════════════
+let zoomLevel = 1, panX = 0, panY = 0;
+const MAX_ZOOM = 5;
+// Pointer movement (in screen px) below this threshold is a click/tap; above it,
+// the gesture becomes a pan. Bumped from the original 5 px because normal taps
+// on touch screens jitter 6–10 px, which used to silently eat brick-placement
+// clicks at zoom > 1.
+const PAN_THRESHOLD = 12;
+
+function getCanvasViewportPoint(clientX, clientY) {
+  const rect = $('canvas-wrap').getBoundingClientRect();
+  return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+// Cursor reflects current *mode*, not just zoom:
+//   - Crosshair while placing bricks (even when zoomed), so the user gets a
+//     clear "click to place" signal instead of the grab-hand.
+//   - Grab when zoomed and not placing (pan affordance).
+//   - Crosshair otherwise.
+function currentCanvasCursor() {
+  if (serverState && serverState.turn === myIdx && serverState.phase === 'aim') {
+    const cs = serverState.castles[myIdx];
+    if (cs && (cs.pendingbricks || 0) > 0) return 'crosshair';
+  }
+  return zoomLevel > 1 ? 'grab' : 'crosshair';
+}
+function refreshCanvasCursor() { canvas.style.cursor = currentCanvasCursor(); }
+
+function applyZoomTransform() {
+  canvas.style.transformOrigin = '0 0';
+  canvas.style.transform = `translate(${panX}px,${panY}px) scale(${zoomLevel})`;
+  refreshCanvasCursor();
+  repositionCannonPopup();
+}
+function clampPan() {
+  const cw = canvas.offsetWidth, ch = canvas.offsetHeight;
+  panX = Math.min(0, Math.max(cw * (1 - zoomLevel), panX));
+  panY = Math.min(0, Math.max(ch * (1 - zoomLevel), panY));
+}
+function resetZoom() {
+  zoomLevel = 1; panX = 0; panY = 0;
+  applyZoomTransform();
+}
+
+// Desktop: scroll-wheel zoom centered on cursor
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  const newZoom = Math.max(1, Math.min(MAX_ZOOM, zoomLevel * factor));
+  if (newZoom === zoomLevel) return;
+  const p = getCanvasViewportPoint(e.clientX, e.clientY);
+  const mx = p.x, my = p.y;
+  panX = mx - (mx - panX) * (newZoom / zoomLevel);
+  panY = my - (my - panY) * (newZoom / zoomLevel);
+  zoomLevel = newZoom;
+  clampPan(); applyZoomTransform();
+}, { passive: false });
+
+// Desktop: drag-to-pan
+let isDragging = false, dragStartX, dragStartY, dragStartPanX, dragStartPanY, dragDistance = 0;
+let dragPanActive = false; // flips true once dragDistance crosses PAN_THRESHOLD
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  isDragging = true; dragDistance = 0; dragPanActive = false;
+  dragStartX = e.clientX; dragStartY = e.clientY;
+  dragStartPanX = panX; dragStartPanY = panY;
+  // Don't flip to grabbing immediately — keep current cursor until we actually
+  // start panning past PAN_THRESHOLD. This avoids the cursor flicker on every
+  // mousedown that turns out to be a click.
+});
+window.addEventListener('mousemove', e => {
+  if (!isDragging || zoomLevel <= 1) return;
+  const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+  dragDistance = Math.hypot(dx, dy);
+  // Defer actually panning until the pointer has crossed PAN_THRESHOLD. Before
+  // that, the gesture is still a candidate click (brick placement etc.) and
+  // shifting the canvas under the cursor would just confuse aim.
+  if (!dragPanActive) {
+    if (dragDistance <= PAN_THRESHOLD) return;
+    dragPanActive = true;
+    canvas.style.cursor = 'grabbing';
+  }
+  panX = dragStartPanX + dx; panY = dragStartPanY + dy;
+  clampPan();
+  canvas.style.transform = `translate(${panX}px,${panY}px) scale(${zoomLevel})`;
+});
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+  dragPanActive = false;
+  refreshCanvasCursor();
+});
+
+// Click on canvas → place a pending brick, sell a tower, or open cannon popup.
+// Double-click resets zoom. getBoundingClientRect() returns transformed bounds,
+// so coordinate mapping works correctly at any zoom/pan level.
+let lastClickTime = 0;
+function handleCanvasClick(e) {
+  const now = Date.now();
+  if (now - lastClickTime < 300) { lastClickTime = 0; dragDistance = 0; resetZoom(); return; }
+  lastClickTime = now;
+  // Reject only when the pointer actually crossed the pan threshold; small
+  // jitter during a normal click no longer eats brick-placement taps. Always
+  // reset dragDistance afterwards so stale state from a prior gesture can't
+  // poison the next click.
+  if (dragDistance > PAN_THRESHOLD) { dragDistance = 0; return; }
+  dragDistance = 0;
+  if (!serverState || serverState.turn !== myIdx || serverState.phase !== 'aim') return;
+  // Border-aware client→canvas mapping. getBoundingClientRect() returns the
+  // full visual bbox INCLUDING the canvas's 3 px CSS border (and the border
+  // scales with `transform: scale(z)`). Treating that bbox as the drawing
+  // area was biasing every click ~12 internal px to the right — visible as
+  // a "right-shift" on the placed brick at high zoom. canvas.clientLeft /
+  // .clientWidth (unscaled, border-excluded) give the actual content box.
+  const rect = canvas.getBoundingClientRect();
+  const innerLeft   = rect.left + canvas.clientLeft  * zoomLevel;
+  const innerTop    = rect.top  + canvas.clientTop   * zoomLevel;
+  const innerWidth  = canvas.clientWidth  * zoomLevel;
+  const innerHeight = canvas.clientHeight * zoomLevel;
+  const sx = (e.clientX - innerLeft) * (W / innerWidth);
+  const sy = (e.clientY - innerTop)  * (H / innerHeight);
+  const cs = serverState.castles[myIdx];
+  if (!cs) return;
+
+  if ((cs.pendingbricks || 0) > 0) {
+    // Reject early on the client if the click is clearly outside the castle
+    // area, otherwise let the server validate fully (neighbour rule etc.).
+    if (sx < cs.basex || sx > cs.basex + cs.basew) {
+      setMsg('Setze Mauersteine in deine Burg.');
+      return;
+    }
+    sendCommand('place_brick', { x: Math.round(sx), y: Math.round(sy) });
+    return;
+  }
+
+  const towerHit = towerHitTest(sx, sy, cs);
+  if (towerHit >= 0) {
+    requestTowerSell(towerHit);
+    return;
+  }
+
+  const hit = cannonHitTest(sx, sy, cs);
+  if (hit >= 0) openCannonPopup(hit);
+}
+canvas.addEventListener('click', handleCanvasClick);
+
+// Mobile: unified touch handler — pinch-zoom, 1-finger pan, tap, double-tap
+let touchStartPos = null, touchMoved = false, lastTapTime = 0;
+let pinchStart = null, touchPanStart = null;
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    touchStartPos = { x: t.clientX, y: t.clientY };
+    touchPanStart = { panX, panY, x: t.clientX, y: t.clientY };
+    touchMoved = false;
+    pinchStart = null;
+  } else if (e.touches.length === 2) {
+    const t1 = e.touches[0], t2 = e.touches[1];
+    const p = getCanvasViewportPoint(
+      (t1.clientX + t2.clientX) / 2,
+      (t1.clientY + t2.clientY) / 2,
+    );
+    pinchStart = {
+      dist: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
+      zoom: zoomLevel, panX, panY,
+      mx: p.x,
+      my: p.y,
+    };
+    touchPanStart = null;
+    touchStartPos = null;
+    touchMoved = true;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length < 2) pinchStart = null;
+  if (e.touches.length === 1 && zoomLevel > 1) {
+    const t = e.touches[0];
+    if (!touchPanStart) {
+      touchPanStart = { panX, panY, x: t.clientX, y: t.clientY };
+      return;
+    }
+    const dx = t.clientX - touchPanStart.x, dy = t.clientY - touchPanStart.y;
+    // Only convert the gesture into a pan once the finger has clearly moved.
+    // Below PAN_THRESHOLD, leave the canvas exactly where it is so the tap
+    // (e.g. place_brick) lands on the cell the user was aiming at.
+    if (!touchMoved) {
+      if (Math.hypot(dx, dy) <= PAN_THRESHOLD) return;
+      touchMoved = true;
+    }
+    panX = touchPanStart.panX + dx; panY = touchPanStart.panY + dy;
+    clampPan(); applyZoomTransform();
+  } else if (e.touches.length === 2 && pinchStart) {
+    const t1 = e.touches[0], t2 = e.touches[1];
+    const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+    const newZoom = Math.max(1, Math.min(MAX_ZOOM, pinchStart.zoom * (dist / pinchStart.dist)));
+    const p = getCanvasViewportPoint(
+      (t1.clientX + t2.clientX) / 2,
+      (t1.clientY + t2.clientY) / 2,
+    );
+    const mx = p.x;
+    const my = p.y;
+    panX = mx - (pinchStart.mx - pinchStart.panX) * (newZoom / pinchStart.zoom);
+    panY = my - (pinchStart.my - pinchStart.panY) * (newZoom / pinchStart.zoom);
+    zoomLevel = newZoom;
+    touchPanStart = null;
+    touchMoved = true;
+    clampPan(); applyZoomTransform();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (e.touches.length === 0) {
+    pinchStart = null;
+    touchPanStart = null;
+  } else if (e.touches.length === 1) {
+    pinchStart = null;
+    const t = e.touches[0];
+    touchPanStart = { panX, panY, x: t.clientX, y: t.clientY };
+  }
+  const wasTap = !touchMoved && touchStartPos && e.changedTouches.length === 1;
+  if (wasTap) {
+    const t = e.changedTouches[0];
+    const now = Date.now();
+    if (now - lastTapTime < 300) {
+      lastTapTime = 0;
+      // Clear gesture state before resetZoom so a stale touchMoved/touchStartPos
+      // from this double-tap can't break the next single tap.
+      touchMoved = false; touchStartPos = null;
+      resetZoom();
+      return;
+    }
+    lastTapTime = now;
+    handleCanvasClick({ clientX: t.clientX, clientY: t.clientY });
+  }
+  // Always reset per-gesture state once all fingers are up. Without this,
+  // a pinch (touchMoved=true) followed by a quick re-tap could inherit the
+  // "moved" flag and silently drop the new tap.
+  if (e.touches.length === 0) {
+    touchMoved = false;
+    touchStartPos = null;
+  }
+}, { passive: false });
+
+// ═══ Market ═════════════════════════════════════════════════════════════════
+// `available(cs)` returns true when the item is buyable on top of the gold
+// check — used to disable cannon/tower/windvane buys that wouldn't apply.
+const MARKET_ITEMS = [
+  { id: 'buy-powder-50', label: '50× Pulver',    desc: 'Pulver für Schüsse',  price: 50,  available: () => true },
+  { id: 'buy-ammo-5',    label: '5× Munition',   desc: 'Normale Kanonenkugeln',       price: 20,  available: () => true },
+  { id: 'buy-shrapnel',  label: 'Schrapnell',    desc: '4 Splitter mit Drift, knackt Kanonen & Wetterfahne, kleiner Krater', price: 100, available: () => true },
+
+  { id: 'buy-bricks',    label: '20× Mauersteine', desc: 'Mauern bauen oder reparieren', price: 90,  available: () => true },
+  { id: 'buy-cannon',    label: 'Kanone wieder', desc: 'Defekte Kanone reaktivieren',     price: 260, available: cs => cs.cannons.some(c => !c.alive) },
+  { id: 'buy-tower',     label: 'Förderturm',    desc: '+16 Gold/Runde netto (24 Bonus, –8 Unterhalt)',    price: 220, available: cs => (cs.towers || []).length < 2 },
+  { id: 'buy-windvane',  label: 'Wetterfahne',   desc: 'Windrichtung exakt sehen',        price: 120, available: cs => !(cs.windvane && cs.windvane.alive) },
+];
+function openMarket() {
+  if (!serverState) return;
+  const cs = serverState.castles[myIdx];
+  if (!cs) return;
+  const pending = cs.pendingbricks || 0;
+  let wallet = 'Dein Gold: <b style="color:#ffd700">' + cs.gold + '</b>';
+  if (pending > 0) wallet += ' &nbsp; 🧱 <b>' + pending + '</b> Steine zu setzen';
+  $('market-wallet').innerHTML = wallet;
+  const cont = $('market-items');
+  cont.innerHTML = '';
+  MARKET_ITEMS.forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'market-item';
+    const ok = (cs.gold >= it.price) && it.available(cs);
+    const disabled = ok ? '' : 'disabled';
+    div.innerHTML =
+      `<span class="item-label">${it.label}<span class="item-desc">${it.desc}</span></span>` +
+      `<span class="item-price">${it.price} G</span>` +
+      `<button onclick="buyItem('${it.id}')" ${disabled}>KAUFEN</button>`;
+    cont.appendChild(div);
+  });
+  $('market-overlay').classList.add('active');
+}
+function closeMarket() { $('market-overlay').classList.remove('active'); }
+window.buyItem = function (id) {
+  sendCommand('buy', { item: id });
+  setTimeout(() => { if ($('market-overlay').classList.contains('active')) openMarket(); }, 50);
+};
+
+// ═══ Game over ══════════════════════════════════════════════════════════════
+let gameOverShown = false;
+function showGameOver() {
+  if (gameOverShown) return;
+  gameOverShown = true;
+  const t = $('overlay-title');
+  const r = $('overlay-reason');
+  if (serverState.winner === myIdx) { t.textContent = '\u{1F3C6} SIEG!'; }
+  else { t.textContent = '\u{1F480} NIEDERLAGE'; }
+  r.textContent = serverState.reason || '';
+  $('overlay').classList.add('active');
+  closeMarket();
+}
+function restart() {
+  $('overlay').classList.remove('active');
+  window.location.href = 'index.html';
+}
+
+// ═══ Render ═════════════════════════════════════════════════════════════════
+// Adapted from the original ballerburg-fix/index.html — same visual style,
+// but reads from `serverState` instead of mutable client-side game state.
+
+function makeStars() {
+  stars = [];
+  for (let i = 0; i < 80; i++) {
+    stars.push({ x: Math.random() * W, y: Math.random() * H * 0.5, r: 1 + Math.random() * 2.5, b: Math.random() });
+  }
+}
+makeStars();
+
+function drawSky() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, SKY_TOP);
+  grad.addColorStop(1, SKY_BOT);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+function drawStars(t) {
+  for (const s of stars) {
+    const b = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * 0.002 + s.b * 10));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,240,${b})`;
+    ctx.fill();
+  }
+}
+function drawTerrain(terrain) {
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = 0; x < W; x++) ctx.lineTo(x, H - terrain[x]);
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#7a6030'); grad.addColorStop(0.3, '#5c4a1e'); grad.addColorStop(1, '#3a2e10');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, H - terrain[0]);
+  for (let x = 1; x < W; x++) ctx.lineTo(x, H - terrain[x]);
+  ctx.strokeStyle = '#3a7a20';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+function drawWall(wall, ci) {
+  if (wall.hp <= 0) return;
+  let base;
+  switch (wall.kind) {
+    case 'roof':       base = ci === 0 ? [166,84,48]   : [176,80,46]; break;
+    case 'battlement': base = ci === 0 ? [170,166,156] : [176,162,150]; break;
+    case 'keep-wall':  base = ci === 0 ? [138,136,128] : [144,132,126]; break;
+    case 'partition':  base = ci === 0 ? [126,124,116] : [132,120,112]; break;
+    case 'tower-out':
+    default:           base = ci === 0 ? [160,156,146] : [166,150,142]; break;
+  }
+  const fill   = `rgb(${base[0]},${base[1]},${base[2]})`;
+  const shade  = `rgb(${Math.max(0,base[0]-30)},${Math.max(0,base[1]-30)},${Math.max(0,base[2]-30)})`;
+  const mortar = 'rgba(30,22,22,0.65)';
+  ctx.fillStyle = fill;
+  for (let ry = 0; ry < wall.rows; ry++) {
+    for (let rx = 0; rx < wall.cols; rx++) {
+      if (!wall.bricks[ry * wall.cols + rx]) continue;
+      ctx.fillRect(wall.x + rx * wall.cellw, wall.y + ry * wall.cellh, wall.cellw + 0.5, wall.cellh + 0.5);
+    }
+  }
+  ctx.strokeStyle = mortar;
+  ctx.lineWidth = 1;
+  for (let ry = 0; ry < wall.rows; ry++) {
+    for (let rx = 0; rx < wall.cols; rx++) {
+      if (!wall.bricks[ry * wall.cols + rx]) continue;
+      ctx.strokeRect(wall.x + rx * wall.cellw + 0.5, wall.y + ry * wall.cellh + 0.5, wall.cellw, wall.cellh);
+    }
+  }
+  ctx.fillStyle = shade;
+  for (let ry = 0; ry < wall.rows; ry++) {
+    for (let rx = 0; rx < wall.cols; rx++) {
+      if (!wall.bricks[ry * wall.cols + rx]) continue;
+      ctx.fillRect(wall.x + rx * wall.cellw, wall.y + ry * wall.cellh + wall.cellh - 2, wall.cellw, 1.5);
+    }
+  }
+  if (wall.kind === 'roof') {
+    ctx.fillStyle = 'rgba(180,80,40,0.4)';
+    for (let rx = 0; rx < wall.cols; rx++) {
+      if (!wall.bricks[0 * wall.cols + rx]) continue;
+      ctx.fillRect(wall.x + rx * wall.cellw, wall.y, wall.cellw, wall.cellh);
+    }
+    ctx.fillStyle = 'rgba(220,190,140,0.35)';
+    for (let rx = 0; rx < wall.cols; rx++) {
+      if (!wall.bricks[0 * wall.cols + rx]) continue;
+      ctx.fillRect(wall.x + rx * wall.cellw, wall.y, wall.cellw, 2);
+    }
+  }
+}
+function mixColor(hex, target, t) {
+  const a = parseInt(hex.slice(1), 16), b = parseInt(target.slice(1), 16);
+  const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+  const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(ab + (bb - ab) * t);
+  return `rgb(${r},${g},${bl})`;
+}
+function drawChamber(ch, ci) {
+  if (!ch.alive) {
+    ctx.fillStyle = 'rgba(60,40,30,0.8)';
+    ctx.fillRect(ch.x, ch.y + ch.h - 14, ch.w, 14);
+    ctx.fillStyle = 'rgba(40,25,15,0.9)';
+    for (let i = 0; i < 5; i++) {
+      const rx = ch.x + 4 + i * (ch.w - 10) / 4;
+      const ry = ch.y + ch.h - 12 - (i % 2) * 3;
+      ctx.beginPath();
+      ctx.arc(rx, ry, 3 + (i % 2), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+  let bg, fg, label, icon;
+  switch (ch.kind) {
+    case 'throne':   bg='#3a2c1a'; fg='#ffd700'; label='Thron';  icon='\u{1F451}'; break;
+    case 'powder':   bg='#4a1818'; fg='#ff8866'; label='Pulver'; icon='\u{1F4A5}'; break;
+    case 'treasure': bg='#1a4a30'; fg='#ffe080'; label='Gold';   icon='\u{1F4B0}'; break;
+    case 'ammo':     bg='#3a3a44'; fg='#d8d8e0'; label='Kugeln'; icon='\u{26AB}';  break;
+    default:         bg='#333333'; fg='#ffffff'; label=ch.kind;  icon='?';         break;
+  }
+  // Chiseled stone alcove: base fill + top highlight band + bottom shadow band + beveled 1px border.
+  ctx.fillStyle = bg;
+  ctx.fillRect(ch.x, ch.y, ch.w, ch.h);
+  ctx.fillStyle = mixColor(bg, '#ffffff', 0.18);
+  ctx.fillRect(ch.x, ch.y, ch.w, 4);
+  ctx.fillStyle = mixColor(bg, '#000000', 0.35);
+  ctx.fillRect(ch.x, ch.y + ch.h - 4, ch.w, 4);
+  // Beveled border — 1px lines via fillRect (no AA fuzz).
+  const bevelLight = mixColor(bg, '#ffffff', 0.45);
+  const bevelDark  = mixColor(bg, '#000000', 0.55);
+  ctx.fillStyle = bevelLight;
+  ctx.fillRect(ch.x, ch.y, ch.w, 1);
+  ctx.fillRect(ch.x, ch.y, 1, ch.h);
+  ctx.fillStyle = bevelDark;
+  ctx.fillRect(ch.x, ch.y + ch.h - 1, ch.w, 1);
+  ctx.fillRect(ch.x + ch.w - 1, ch.y, 1, ch.h);
+  // Icon — centered slightly above middle to leave room for label below.
+  const iconSize = Math.min(Math.floor(ch.w * 0.6), Math.floor(ch.h * 0.45), 52);
+  ctx.font = `${iconSize}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = fg;
+  ctx.fillText(icon, ch.x + ch.w / 2, ch.y + ch.h * 0.42);
+  // Label — below icon, dark stroke for legibility against the bottom shadow band.
+  ctx.font = 'bold 16px "Courier New", monospace';
+  ctx.textBaseline = 'bottom';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  ctx.strokeText(label, ch.x + ch.w / 2, ch.y + ch.h - 6);
+  ctx.fillStyle = fg;
+  ctx.fillText(label, ch.x + ch.w / 2, ch.y + ch.h - 6);
+}
+function drawKing(king, ci) {
+  if (!king.alive) return;
+  const x = king.x, y = king.y;
+  const col = ci === 0 ? '#4488ff' : '#ff4444';
+  ctx.fillStyle = col;
+  ctx.fillRect(x - 7, y, 14, 18);
+  ctx.fillStyle = '#f5c5a0';
+  ctx.beginPath();
+  ctx.arc(x, y - 6, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = KING_COLOR;
+  ctx.beginPath();
+  ctx.moveTo(x - 9, y - 13);
+  ctx.lineTo(x - 9, y - 22);
+  ctx.lineTo(x - 4, y - 18);
+  ctx.lineTo(x,     y - 24);
+  ctx.lineTo(x + 4, y - 18);
+  ctx.lineTo(x + 9, y - 22);
+  ctx.lineTo(x + 9, y - 13);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ff2020';
+  ctx.beginPath();
+  ctx.arc(x, y - 22, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+function drawCannon(cn, ci, idx, isMyCastle, isMyTurn) {
+  if (!cn.alive) return;
+  const isActive = isMyCastle && isMyTurn && activeCannon === idx;
+  const angleDeg = isActive ? (parseInt($('popup-angle').value) || 45) : 45;
+  const rad = angleDeg * Math.PI / 180;
+  const dir = cn.side;
+  const len = 40;
+  const ex = cn.bx + Math.cos(rad) * len * dir;
+  const ey = cn.by - Math.sin(rad) * len;
+  ctx.save();
+  ctx.strokeStyle = isActive ? '#ffd700' : '#888';
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cn.bx, cn.by);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.fillStyle = isActive ? '#ccc' : '#666';
+  ctx.beginPath();
+  ctx.arc(cn.bx, cn.by, 13, 0, Math.PI * 2);
+  ctx.fill();
+  if (isActive) {
+    ctx.strokeStyle = 'rgba(255,215,0,0.4)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex + Math.cos(rad) * 80 * dir, ey - Math.sin(rad) * 80);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+function drawTower(tw, ci) {
+  if (tw.hp <= 0) return;
+  const alpha = tw.hp / tw.hpmax;
+  const base = ci === 0 ? [90, 100, 140] : [140, 100, 90];
+  ctx.fillStyle = `rgba(${base[0]},${base[1]},${base[2]},${0.4 + 0.6 * alpha})`;
+  ctx.fillRect(tw.x, tw.y, tw.w, tw.h);
+  ctx.strokeStyle = `rgba(40,30,30,${alpha * 0.7})`;
+  const bw = 12, bh = 10;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(tw.x, tw.y, tw.w, tw.h);
+  ctx.clip();
+  for (let row = 0; row * bh < tw.h; row++) {
+    const offset = (row % 2) * (bw / 2);
+    for (let col = -1; col * bw < tw.w + bw; col++) {
+      ctx.strokeRect(tw.x + col * bw + offset, tw.y + row * bh, bw, bh);
+    }
+  }
+  ctx.restore();
+  ctx.fillStyle = ci === 0 ? '#2a4488' : '#882a2a';
+  ctx.beginPath();
+  ctx.moveTo(tw.x, tw.y);
+  ctx.lineTo(tw.x + tw.w / 2, tw.y - 22);
+  ctx.lineTo(tw.x + tw.w, tw.y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = ci === 0 ? '#4488ff' : '#ff4444';
+  ctx.fillRect(tw.x + tw.w / 2 - 1, tw.y - 34, 2, 16);
+  ctx.fillRect(tw.x + tw.w / 2, tw.y - 34, 14, 8);
+}
+function drawWindVane(castle, ci, windView) {
+  const v = castle.windvane;
+  if (!v || !v.owned || !v.alive) return;
+  const wind = windView?.wind || 0;
+  const exact = !!windView?.exact;
+  ctx.save();
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.moveTo(v.x, v.y);
+  ctx.lineTo(v.x, v.towery);
+  ctx.stroke();
+  const dir = wind >= 0 ? 1 : -1;
+  const flagLen = 58;
+  const flagH   = 19;
+  ctx.fillStyle = ci === 0 ? '#6699ff' : '#ff6666';
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(v.x, v.y);
+  ctx.lineTo(v.x + dir * flagLen, v.y - flagH);
+  ctx.lineTo(v.x + dir * flagLen, v.y + flagH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffe9a0';
+  ctx.beginPath();
+  ctx.arc(v.x, v.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+  if (ci !== myIdx) {
+    ctx.restore();
+    return;
+  }
+  const textY = v.y - flagH - 14;
+  ctx.font = 'bold 32px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  const label = `${wind >= 0 ? '→' : '←'} ${Math.abs(wind).toFixed(2)}${exact ? '' : ' ?'}`;
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  ctx.strokeText(label, v.x, textY);
+  ctx.fillStyle = '#ffe080';
+  ctx.fillText(label, v.x, textY);
+  ctx.restore();
+}
+function drawProjectile(p) {
+  if (!p) return;
+  // Type-specific look — shrapnel = small white-hot fragments.
+  const ptype = p.ptype || '';
+  let ballR, glowR, core, ring, trailColor;
+  if (ptype === 'shrapnel') {
+    ballR = 22; glowR = 50;
+    core = '#ffe080'; ring = '#ffffff';
+    trailColor = 'rgba(255,240,180,';
+  } else {
+    ballR = 70; glowR = 140;
+    core = '#ff8800'; ring = '#ffffff';
+    trailColor = 'rgba(255,255,220,';
+  }
+
+  // Trail
+  for (let i = 0; i < (p.trail?.length || 0); i++) {
+    const t = p.trail[i];
+    const frac = (i + 1) / p.trail.length;
+    const r = (ptype === 'shrapnel' ? 4 : 10) + frac * (ptype === 'shrapnel' ? 6 : 12);
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r + 12, 0, Math.PI * 2);
+    ctx.fillStyle = trailColor + (frac * 0.2) + ')';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = trailColor + (frac * 0.9) + ')';
+    ctx.fill();
+  }
+  if (p.y < 0) {
+    const cx = Math.max(16, Math.min(W - 16, p.x));
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,220,100,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(cx, 6);
+    ctx.lineTo(cx - 14, 24);
+    ctx.lineTo(cx + 14, 24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = 'bold 14px "Courier New", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.round(-p.y)}px`, cx, 42);
+    ctx.restore();
+    return;
+  }
+  ctx.beginPath(); ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,200,80,0.06)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y, glowR * 0.6, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,220,100,0.12)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y, ballR * 0.7, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,200,0.18)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y, ballR, 0, Math.PI * 2); ctx.fillStyle = core; ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y, ballR + 4, 0, Math.PI * 2); ctx.strokeStyle = ring; ctx.lineWidth = 4; ctx.stroke();
+  if (ptype !== 'shrapnel') {
+    ctx.beginPath(); ctx.arc(p.x, p.y, ballR * 0.7, 0, Math.PI * 2); ctx.fillStyle = '#ffffcc'; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, ballR * 0.35, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+  }
+}
+function drawAIStatus(s) {
+  if (!s.aiaction) return;
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  // shadowed banner across mid-canvas
+  const cx = W / 2, cy = H / 2;
+  ctx.font = 'bold 110px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 14;
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.strokeText(s.aiaction, cx, cy);
+  ctx.fillStyle = '#ffd700';
+  ctx.fillText(s.aiaction, cx, cy);
+  ctx.font = 'bold 36px "Courier New", monospace';
+  ctx.fillStyle = 'rgba(255,235,160,0.85)';
+  ctx.fillText('— bitte warten —', cx, cy + 70);
+  ctx.restore();
+}
+function drawTurnIndicator(s) {
+  const c = s.castles[s.turn];
+  if (!c) return;
+  ctx.save();
+  ctx.strokeStyle = s.turn === 0 ? 'rgba(80,140,255,0.45)' : 'rgba(255,80,80,0.45)';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([14, 8]);
+  ctx.strokeRect(c.basex + 4, 0, c.basew - 8, H);
+  ctx.restore();
+}
+function drawWindArrow(s, windView) {
+  const v = s.castles[s.turn]?.windvane;
+  if (!v || !v.alive || !v.owned) return;
+  const shownWind = windView?.wind || 0;
+  const cx = W / 2, cy = 62;
+  const len = Math.abs(shownWind) * 120;
+  const dir = shownWind >= 0 ? 1 : -1;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(220,235,255,0.82)';
+  ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(cx - len * dir, cy); ctx.lineTo(cx + len * dir, cy); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + len * dir, cy);
+  ctx.lineTo(cx + len * dir - dir * 24, cy - 14);
+  ctx.lineTo(cx + len * dir - dir * 24, cy + 14);
+  ctx.fillStyle = 'rgba(220,235,255,0.82)';
+  ctx.fill();
+  ctx.restore();
+}
+
+function loop(t = 0) {
+  requestAnimationFrame(loop);
+  ctx.clearRect(0, 0, W, H);
+  drawSky();
+  drawStars(t);
+  if (!serverState) {
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 80px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(connected ? 'Warte auf Spielzustand…' : 'Verbinde…', W/2, H/2);
+    return;
+  }
+  const windView = getWindView(serverState);
+  drawWindArrow(serverState, windView);
+  if (serverState.phase === 'aim') drawTurnIndicator(serverState);
+  drawTerrain(serverState.terrain.data);
+  // Towers behind walls
+  for (let ci = 0; ci < 2; ci++) {
+    for (const tw of (serverState.castles[ci].towers || [])) drawTower(tw, ci);
+  }
+  // Walls
+  for (let ci = 0; ci < 2; ci++) {
+    for (const w of (serverState.castles[ci].walls || [])) drawWall(w, ci);
+  }
+  // Chambers
+  for (let ci = 0; ci < 2; ci++) {
+    for (const ch of (serverState.castles[ci].chambers || [])) drawChamber(ch, ci);
+  }
+  // Kings
+  for (let ci = 0; ci < 2; ci++) drawKing(serverState.castles[ci].king, ci);
+  // Wind vanes
+  for (let ci = 0; ci < 2; ci++) drawWindVane(serverState.castles[ci], ci, windView);
+  // Cannons
+  for (let ci = 0; ci < 2; ci++) {
+    const isMy = ci === myIdx;
+    const isMyTurn = serverState.turn === myIdx;
+    (serverState.castles[ci].cannons || []).forEach((cn, i) => drawCannon(cn, ci, i, isMy, isMyTurn));
+  }
+  // Projectiles on top (multi-shot — Schrapnell fires 4 fragments at once)
+  for (const p of (serverState.projectiles || [])) drawProjectile(p);
+  // AI status overlay (e.g. "Computer baut Mauern") — drawn last so it's on top.
+  drawAIStatus(serverState);
+}
+
+// ═══ Boot ═══════════════════════════════════════════════════════════════════
+if (hasPlayerIdentity) {
+  connectWS();
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

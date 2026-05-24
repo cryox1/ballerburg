@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ballerburg — Admin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; color: #c9d1d9; font-family: 'Courier New', monospace; padding: 24px; }
+    h1 { color: #f0f6fc; margin-bottom: 20px; font-size: 1.3rem; letter-spacing: 1px; }
+
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; }
+    .card-label { font-size: 0.72rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; }
+    .card-value { font-size: 2.1rem; color: #58a6ff; font-weight: bold; margin-top: 4px; line-height: 1; }
+    .card-sub { font-size: 0.72rem; color: #8b949e; margin-top: 5px; }
+
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; }
+    .box-title { font-size: 0.72rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+    canvas { display: block; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    th { color: #8b949e; text-align: left; border-bottom: 1px solid #30363d; padding: 5px 8px; font-weight: normal; font-size: 0.72rem; text-transform: uppercase; }
+    td { padding: 5px 8px; border-bottom: 1px solid #21262d; }
+    tr:last-child td { border-bottom: none; }
+
+    #login { max-width: 340px; margin: 100px auto; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 32px; }
+    #login h2 { color: #f0f6fc; margin-bottom: 4px; font-size: 1.1rem; }
+    #login p { color: #8b949e; font-size: 0.8rem; margin-bottom: 20px; }
+    #login input { width: 100%; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 9px 12px; color: #c9d1d9; font-family: inherit; font-size: 0.95rem; margin-bottom: 10px; outline: none; }
+    #login input:focus { border-color: #58a6ff; }
+    #login button { background: #238636; border: none; border-radius: 4px; color: #fff; padding: 9px 20px; cursor: pointer; font-family: inherit; font-size: 0.9rem; }
+    #login button:hover { background: #2ea043; }
+    #login-err { color: #f85149; margin-top: 8px; font-size: 0.8rem; min-height: 1.2em; }
+
+    #status { font-size: 0.72rem; color: #8b949e; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+    .dot { width: 7px; height: 7px; background: #3fb950; border-radius: 50%; animation: blink 2s infinite; flex-shrink: 0; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    #logout { font-size: 0.72rem; color: #8b949e; cursor: pointer; margin-left: auto; text-decoration: underline; }
+    #logout:hover { color: #c9d1d9; }
+
+    @media(max-width:680px){ .row2{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+
+<div id="login" style="display:none">
+  <h2>Ballerburg Admin</h2>
+  <p>Enter your admin token to continue.</p>
+  <input id="tok" type="password" placeholder="Admin token" autocomplete="current-password">
+  <button onclick="saveToken()">Enter</button>
+  <div id="login-err"></div>
+</div>
+
+<div id="dashboard" style="display:none">
+  <h1>&#9876; Ballerburg &mdash; Admin Dashboard</h1>
+  <div id="status"><span class="dot"></span><span id="status-text">Loading&hellip;</span><span id="logout" onclick="logout()">Log out</span></div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="row2">
+    <div class="box">
+      <div class="box-title">Hourly Sessions &mdash; last 24 h (UTC)</div>
+      <canvas id="chart-hourly"></canvas>
+    </div>
+    <div class="box">
+      <div class="box-title">Daily Matches &mdash; last 7 days</div>
+      <canvas id="chart-daily"></canvas>
+    </div>
+  </div>
+
+  <div class="row2">
+    <div class="box">
+      <div class="box-title">Game Type Breakdown</div>
+      <table id="tbl-gt"></table>
+    </div>
+    <div class="box">
+      <div class="box-title">Top Players by Sessions</div>
+      <table id="tbl-top"></table>
+    </div>
+  </div>
+</div>
+
+<script>
+let tok = '';
+let timer = null;
+
+function init() {
+  tok = localStorage.getItem('bb_tok') || '';
+  const h = location.hash.replace('#', '');
+  if (h.startsWith('token=')) {
+    tok = h.slice(6);
+    localStorage.setItem('bb_tok', tok);
+    history.replaceState(null, '', location.pathname);
+  }
+  if (tok) showDash(); else showLogin();
+}
+
+function showLogin() {
+  document.getElementById('login').style.display = '';
+  document.getElementById('dashboard').style.display = 'none';
+}
+
+function showDash() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('dashboard').style.display = '';
+  load();
+  timer = setInterval(load, 30000);
+}
+
+function saveToken() {
+  const v = document.getElementById('tok').value.trim();
+  if (!v) return;
+  tok = v;
+  localStorage.setItem('bb_tok', tok);
+  showDash();
+}
+
+document.getElementById('tok').addEventListener('keydown', e => { if (e.key === 'Enter') saveToken(); });
+
+function logout() {
+  clearInterval(timer);
+  tok = '';
+  localStorage.removeItem('bb_tok');
+  showLogin();
+}
+
+async function load() {
+  try {
+    const url = '/api/admin' + (tok ? '?token=' + encodeURIComponent(tok) : '');
+    const r = await fetch(url, { cache: 'no-store' });
+    if (r.status === 401) {
+      clearInterval(timer);
+      document.getElementById('login-err').textContent = 'Invalid token.';
+      showLogin();
+      return;
+    }
+    const d = await r.json();
+    render(d);
+    document.getElementById('status-text').textContent = 'Updated ' + new Date().toLocaleTimeString() + ' — refreshes every 30 s';
+  } catch(e) {
+    document.getElementById('status-text').textContent = 'Error: ' + e.message;
+  }
+}
+
+function render(d) {
+  const lv = d.live || {};
+
+  // Stat cards
+  const cards = [
+    { label: 'Active Players',    value: lv.active_players ?? 0,  sub: (lv.active_lobbies ?? 0) + ' lobbies open' },
+    { label: 'PvP / AI Lobbies',  value: (lv.pvp_lobbies ?? 0) + ' / ' + (lv.ai_lobbies ?? 0), sub: 'currently running' },
+    { label: 'Sessions Today',    value: d.sessions_today ?? 0,   sub: (d.sessions_week ?? 0) + ' this week · ' + (d.sessions_total ?? 0) + ' total' },
+    { label: 'Matches Today',     value: d.matches_today ?? 0,    sub: (d.matches_week ?? 0) + ' this week · ' + (d.matches_total ?? 0) + ' total' },
+  ];
+  document.getElementById('cards').innerHTML = cards.map(c =>
+    '<div class="card"><div class="card-label">' + esc(c.label) + '</div><div class="card-value">' + esc(String(c.value)) + '</div><div class="card-sub">' + esc(String(c.sub)) + '</div></div>'
+  ).join('');
+
+  // Charts
+  drawBars('chart-hourly',
+    Array.from({length:24}, (_,i) => String(i).padStart(2,'0')+'h'),
+    d.hourly_sessions || new Array(24).fill(0),
+    '#58a6ff', 110
+  );
+  const dm = d.daily_matches || [];
+  drawBars('chart-daily',
+    dm.map(x => x.day.slice(5)),
+    dm.map(x => x.count),
+    '#3fb950', 110
+  );
+
+  // Game type table
+  const gt = d.game_type_breakdown || {};
+  const gtRows = Object.entries(gt).sort((a,b) => b[1]-a[1]);
+  document.getElementById('tbl-gt').innerHTML =
+    '<tr><th>Type</th><th>Sessions</th></tr>' +
+    (gtRows.length
+      ? gtRows.map(([k,v]) => '<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>').join('')
+      : '<tr><td colspan="2" style="color:#8b949e;padding:12px 8px">No sessions recorded yet</td></tr>');
+
+  // Top players table
+  const tp = d.top_players_by_sessions || [];
+  document.getElementById('tbl-top').innerHTML =
+    '<tr><th>#</th><th>Player</th><th>Sessions</th></tr>' +
+    (tp.length
+      ? tp.map((p,i) => '<tr><td>' + (i+1) + '</td><td>' + esc(p.name) + '</td><td>' + p.count + '</td></tr>').join('')
+      : '<tr><td colspan="3" style="color:#8b949e;padding:12px 8px">No sessions recorded yet</td></tr>');
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function drawBars(id, labels, values, color, h) {
+  const canvas = document.getElementById(id);
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 32;
+  if (W <= 0) return;
+  canvas.width = W * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const max = Math.max(...values, 1);
+  const n = labels.length;
+  const pL = 28, pR = 4, pT = 6, pB = 22;
+  const bw = (W - pL - pR) / n;
+
+  ctx.clearRect(0, 0, W, h);
+
+  // Grid lines + Y labels
+  ctx.strokeStyle = '#21262d';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#8b949e';
+  ctx.font = '9px Courier New';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 3; i++) {
+    const y = pT + (h - pT - pB) * (1 - i/3);
+    ctx.beginPath(); ctx.moveTo(pL, y); ctx.lineTo(W - pR, y); ctx.stroke();
+    ctx.fillText(Math.round(max * i / 3), pL - 3, y + 3);
+  }
+
+  // Bars
+  ctx.fillStyle = color;
+  for (let i = 0; i < n; i++) {
+    const bh = (values[i] / max) * (h - pT - pB);
+    if (bh < 1) continue;
+    ctx.fillRect(pL + i * bw + 1, pT + (h - pT - pB) - bh, bw - 2, bh);
+  }
+
+  // X labels (sparse)
+  ctx.fillStyle = '#8b949e';
+  ctx.textAlign = 'center';
+  const step = Math.ceil(n / 8);
+  for (let i = 0; i < n; i += step) {
+    ctx.fillText(labels[i], pL + (i + 0.5) * bw, h - pB + 13);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

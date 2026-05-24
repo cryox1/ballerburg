@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ballerburg — Tutorial</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: #1a0a00;
+  font-family: 'Courier New', monospace;
+  color: #f0d080;
+  min-height: 100vh;
+}
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 30px 20px 60px;
+}
+
+h1 {
+  font-size: 2rem;
+  color: #ffd700;
+  text-shadow: 0 0 20px #ff8800;
+  letter-spacing: 0.3em;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  text-align: center;
+  color: #a06030;
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  margin-bottom: 36px;
+}
+
+/* Step cards */
+.step {
+  border: 2px solid #8b4513;
+  background: #2a1400;
+  margin-bottom: 20px;
+  padding: 18px 20px;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.step-num {
+  background: #8b4513;
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 1.1rem;
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-title {
+  color: #ffd700;
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  font-weight: bold;
+}
+
+.step p {
+  color: #e0c080;
+  line-height: 1.65;
+  font-size: 0.92rem;
+  margin-bottom: 10px;
+}
+.step p:last-child { margin-bottom: 0; }
+
+/* Key highlight */
+kbd {
+  background: #3a2000;
+  border: 1px solid #aa7733;
+  color: #ffd700;
+  padding: 2px 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+/* Resource icon line */
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.resource-item {
+  background: #1a0a00;
+  border: 1px solid #553311;
+  padding: 8px 12px;
+}
+.resource-item .icon { font-size: 1.2rem; }
+.resource-item .name { color: #ffd700; font-weight: bold; font-size: 0.9rem; }
+.resource-item .desc { color: #a08060; font-size: 0.78rem; margin-top: 3px; line-height: 1.4; }
+
+/* Castle diagram */
+.castle-diagram {
+  background: #1a0a00;
+  border: 1px solid #553311;
+  padding: 14px 16px;
+  margin: 12px 0;
+  font-size: 0.82rem;
+  color: #d0b060;
+  line-height: 1.8;
+}
+.castle-diagram .label { color: #ffd700; font-weight: bold; }
+.castle-diagram .danger { color: #ff6666; font-weight: bold; }
+.castle-diagram .note { color: #a08060; font-style: italic; }
+
+/* Market table */
+.market-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 0.86rem;
+}
+.market-table th {
+  background: #3a1800;
+  color: #ffd700;
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 2px solid #8b4513;
+  letter-spacing: 0.06em;
+  font-size: 0.8rem;
+}
+.market-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #3a2000;
+  color: #e0c080;
+  vertical-align: top;
+}
+.market-table tr:last-child td { border-bottom: none; }
+.market-table .price { color: #ffcc00; font-weight: bold; white-space: nowrap; }
+
+/* Tip box */
+.tip {
+  background: #001a0a;
+  border-left: 4px solid #00aa44;
+  padding: 10px 14px;
+  margin: 12px 0;
+  font-size: 0.86rem;
+  color: #88ffbb;
+  line-height: 1.55;
+}
+.tip strong { color: #aaffdd; }
+
+/* Warning box */
+.warn {
+  background: #1a0800;
+  border-left: 4px solid #cc4400;
+  padding: 10px 14px;
+  margin: 12px 0;
+  font-size: 0.86rem;
+  color: #ffbb88;
+  line-height: 1.55;
+}
+
+/* Win condition box */
+.win-box {
+  background: #1a1000;
+  border: 2px solid #aa8800;
+  padding: 14px 18px;
+  margin: 12px 0;
+}
+.win-box .win-title {
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+  letter-spacing: 0.08em;
+}
+.win-box ul { padding-left: 20px; }
+.win-box li { color: #e0c070; font-size: 0.88rem; line-height: 1.7; }
+.win-box li span { color: #ffaa44; }
+
+/* Back button */
+.back-btn {
+  display: block;
+  margin: 36px auto 0;
+  background: #553300;
+  color: #ffcc88;
+  border: 2px solid #aa7733;
+  padding: 14px 40px;
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+  max-width: 280px;
+}
+.back-btn:hover { background: #774400; }
+.legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 18px;
+  font-size: 0.78rem;
+}
+.legal-links a { color: #a06030; text-decoration: none; }
+.legal-links a:hover { color: #ffcc88; text-decoration: underline; }
+
+/* Section divider */
+.divider {
+  border: none;
+  border-top: 1px solid #3a2000;
+  margin: 28px 0;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>🏰 BALLERBURG 🏰</h1>
+  <div class="subtitle">— SPIELANLEITUNG —</div>
+
+  <!-- STEP 1: Goal -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">Spielziel</div>
+    </div>
+    <p>Ballerburg ist ein rundenbasiertes Artillerie-Duell für zwei Spieler. Jeder Spieler beherrscht eine Burg auf entgegengesetzten Seiten des Bildschirms.</p>
+    <div class="win-box">
+      <div class="win-title">So gewinnst du:</div>
+      <ul>
+        <li><span>Thron zerstören</span> — Schieße durch die Mauern bis in die Thronkammer. Der König stirbt = sofortiger Sieg.</li>
+        <li><span>Gegner zur Kapitulation zwingen</span> — Hat der Gegner keine Kanonen, nicht genug Gold für eine neue und kaum noch Bevölkerung, gibt er auf.</li>
+        <li><span>Rundenende (Runde 40)</span> — Wer nach 40 Runden den höheren Gesamtwert hat (Gold, Kanonen, Munition …) gewinnt.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- STEP 2: Start screen -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">Spiel starten</div>
+    </div>
+    <p>Auf dem Startbildschirm gibst du deinen Namen und deine Fakultät ein. Dann:</p>
+    <p>
+      <kbd>LOBBY ERZEUGEN</kbd> — Du erstellst ein Spiel und bekommst einen sechsstelligen Code.<br>
+      Teile diesen Code mit deinem Gegner, der dann über <kbd>BEITRETEN</kbd> + Code einsteigen kann.
+    </p>
+    <div class="tip"><strong>Tipp:</strong> Den Lobby-Code im Spiel oben rechts per <kbd>Kopieren</kbd> in die Zwischenablage kopieren und z.&nbsp;B. per Chat verschicken.</div>
+  </div>
+
+  <!-- STEP 3: The UI -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">Die Spieloberfläche verstehen</div>
+    </div>
+    <p>Oben siehst du die Statusleiste — hier der Überblick über alle Werte:</p>
+    <div class="resource-grid">
+      <div class="resource-item">
+        <div class="icon">💰</div>
+        <div class="name">Gold</div>
+        <div class="desc">Deine Währung. Kommt aus Steuern und Fördertürmen.</div>
+      </div>
+      <div class="resource-item">
+        <div class="icon">💥</div>
+        <div class="name">Pulver</div>
+        <div class="desc">Treibstoff pro Schuss. Mehr Pulver = größere Reichweite.</div>
+      </div>
+      <div class="resource-item">
+        <div class="icon">🪖</div>
+        <div class="name">Munition</div>
+        <div class="desc">Kanonenkugeln. Jeder Schuss kostet 1 Kugel.</div>
+      </div>
+      <div class="resource-item">
+        <div class="icon">👥</div>
+        <div class="name">Bevölkerung</div>
+        <div class="desc">Größere Bevölkerung = mehr Steuereinnahmen pro Runde.</div>
+      </div>
+      <div class="resource-item">
+        <div class="icon">💨</div>
+        <div class="name">Wind</div>
+        <div class="desc">Beeinflusst die Flugbahn. Zeigt Richtung und Stärke.</div>
+      </div>
+    </div>
+    <p>Unten links gibt es den <strong>Steuer-Regler</strong>, den <strong>MARKT</strong>-Button und den <strong>FERTIG</strong>-Button zum Zug beenden.</p>
+  </div>
+
+  <!-- STEP 4: Castle layout -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div class="step-title">Aufbau der Burg (Dreitürme)</div>
+    </div>
+    <p>Jede Burg hat den gleichen Aufbau — zwei Flankentürme außen, ein Bergfried in der Mitte. Alle Kammern sind zunächst durch Mauern geschützt.</p>
+    <div class="castle-diagram">
+      <span class="label">Flankenturm links</span> &nbsp;|&nbsp; <span class="label">Bergfried (Mitte)</span> &nbsp;|&nbsp; <span class="label">Flankenturm rechts</span><br>
+      <br>
+      Vorderer Turm (Richtung Gegner):<br>
+      &nbsp;&nbsp;→ Kammer: <span class="label">⚙ Munitionslager</span> — Treffer leert deine Kugeln<br>
+      &nbsp;&nbsp;→ Kanone 1 (Primärgeschütz)<br>
+      <br>
+      Hinterer Turm:<br>
+      &nbsp;&nbsp;→ Kammer: <span class="label">💥 Pulverkammer</span> — Treffer leert dein Pulver + Riesenexplosion!<br>
+      &nbsp;&nbsp;→ Kanone 2 (Sekundärgeschütz)<br>
+      <br>
+      Bergfried (linke Hälfte, zur Rückseite):<br>
+      &nbsp;&nbsp;→ Kammer: <span class="danger">👑 THRON</span> — <span class="danger">Sofortiger Sieg für den Angreifer!</span><br>
+      <br>
+      Bergfried (rechte Hälfte, zur Vorderseite):<br>
+      &nbsp;&nbsp;→ Kammer: <span class="label">💰 Schatzkammer</span> — Treffer leert dein Gold<br>
+      <br>
+      Auf dem Bergfried: <span class="label">🚩 Wetterfahne</span> &nbsp;<span class="note">(zeigt den genauen Wind)</span>
+    </div>
+    <div class="tip"><strong>Wichtig:</strong> Kammern sind nur durch Mauerlücken erreichbar. Erst die Wände zerstören, dann die Kammer treffen.</div>
+  </div>
+
+  <!-- STEP 5: Firing -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">5</div>
+      <div class="step-title">Schießen — so geht's</div>
+    </div>
+    <p>Wenn du an der Reihe bist, ist dein Burgbereich mit einer gestrichelten Linie markiert.</p>
+    <p><strong>Schritt für Schritt:</strong></p>
+    <p>
+      1. <strong>Klicke auf eine deiner Kanonen</strong> auf der Leinwand. Es öffnet sich ein kleines Einstellungsfenster.<br>
+      2. Stelle den <strong>Winkel</strong> ein (10°–89°). Flacher Winkel = weiterer Schuss; steiler Winkel = kürzere Distanz, aber trifft hinter Hindernisse.<br>
+      3. Stelle die <strong>Pulvermenge</strong> ein (5–50). Mehr Pulver = mehr Reichweite — kostet aber Pulvervorrat!<br>
+      4. Klicke <kbd>FEUER!</kbd>
+    </p>
+    <div class="tip">
+      <strong>Wind beachten:</strong> Ein Pfeil in der Mitte des Bildschirms zeigt die aktuelle Windstärke und -richtung. Bei starkem Wind musst du deine Kanone gegenüber dem Wind einstellen — oder einfach etwas mehr oder weniger schießen.
+    </div>
+    <div class="warn">
+      Wenn deine <strong>Wetterfahne zerstört</strong> wurde, siehst du nur noch einen ungefähren Windwert (mit "?"). Kaufe im Markt eine neue, um wieder genauen Wind zu sehen.
+    </div>
+  </div>
+
+  <!-- STEP 6: Market -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">6</div>
+      <div class="step-title">Der Markt</div>
+    </div>
+    <p>Klicke auf <kbd>⚔ MARKT</kbd>, um Gegenstände zu kaufen. Du kannst pro Zug beliebig viele Dinge kaufen, solange du Gold hast.</p>
+    <table class="market-table">
+      <tr>
+        <th>Gegenstand</th>
+        <th>Preis</th>
+        <th>Effekt</th>
+      </tr>
+      <tr>
+        <td>50× Pulver</td>
+        <td class="price">50 G</td>
+        <td>+50 Pulvervorrat</td>
+      </tr>
+      <tr>
+        <td>5× Munition</td>
+        <td class="price">20 G</td>
+        <td>+5 normale Kanonenkugeln</td>
+      </tr>
+      <tr>
+        <td>Schrapnell</td>
+        <td class="price">100 G</td>
+        <td>1 Schuss = 4 Splitter mit zufälligem Drift. Kleiner Krater, aber zerstört Kanonen und Wetterfahne. Im Kanonen-Popup bei "Munition" auswählen.</td>
+      </tr>
+
+      <tr>
+        <td>20× Mauersteine</td>
+        <td class="price">90 G</td>
+        <td>Steine ins eigene Burgareal setzen oder Mauern reparieren</td>
+      </tr>
+      <tr>
+        <td>Kanone reparieren</td>
+        <td class="price">260 G</td>
+        <td>Eine zerstörte Kanone wieder in Betrieb nehmen</td>
+      </tr>
+      <tr>
+        <td>Förderturm</td>
+        <td class="price">220 G</td>
+        <td>+16 Gold/Runde netto (24 Bonus, –8 Unterhalt). Maximal 2 Türme.</td>
+      </tr>
+      <tr>
+        <td>Wetterfahne</td>
+        <td class="price">120 G</td>
+        <td>Zeigt dir den genauen Windwert (statt dem ungenauen Schätzwert)</td>
+      </tr>
+    </table>
+    <div class="tip"><strong>Mauersteine setzen:</strong> Nach dem Kauf blendet sich ein Banner ein. Klicke in dein Burgareal auf die Stelle, wo ein neuer Stein hin soll. Neue Steine müssen an bestehende Mauern angrenzen. Erst wenn alle Steine gesetzt sind, kannst du den Zug beenden.</div>
+    <div class="tip"><strong>Förderturm verkaufen:</strong> Klicke in deinem Zug direkt auf einen eigenen Förderturm und bestätige den Verkauf. Du bekommst 110 G zurück.</div>
+    <div class="tip"><strong>Spezial-Munition wählen:</strong> Klicke eine eigene Kanone an und wähle im Popup oben bei <em>Munition</em> zwischen Normal und Schrapnell. In Klammern siehst du, wie viele Schüsse jeder Sorte du noch hast.</div>
+  </div>
+
+  <!-- STEP 7: Taxes & Economy -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">7</div>
+      <div class="step-title">Steuern &amp; Wirtschaft</div>
+    </div>
+    <p>Am unteren Rand gibt es den <strong>Steuer-Regler</strong> (0–100 %). Am Ende jedes Zuges bekommst du Einnahmen basierend auf:</p>
+    <p><em>Einkommen = Bevölkerung × Steuersatz × Basisrate</em></p>
+    <div class="resource-grid">
+      <div class="resource-item">
+        <div class="name">≥ 80 % Steuer</div>
+        <div class="desc">Hohes Einkommen, Bevölkerung schrumpft stark (−8 bis −11/Runde)</div>
+      </div>
+      <div class="resource-item">
+        <div class="name">45–65 % Steuer</div>
+        <div class="desc">Mittleres Einkommen, Bevölkerung bleibt stabil (±2/Runde)</div>
+      </div>
+      <div class="resource-item">
+        <div class="name">≤ 25 % Steuer</div>
+        <div class="desc">Wenig Einkommen, Bevölkerung wächst schnell (+4 bis +6/Runde)</div>
+      </div>
+    </div>
+    <div class="tip"><strong>Strategie:</strong> In der Frühphase moderate Steuern (~40–50 %) halten, damit die Bevölkerung nicht einbricht. In einer Notsituation kurzzeitig hochschrauben, um schnell Gold zu kriegen — danach wieder senken.</div>
+  </div>
+
+  <!-- STEP 8: Repairs -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">8</div>
+      <div class="step-title">Mauern reparieren</div>
+    </div>
+    <p>Beschädigte Mauern reparierst du mit Mauersteinen aus dem Markt.</p>
+    <p>
+      <strong>Mauersteine:</strong> Kaufe 20× Mauersteine (90 G) und platziere sie in deinem Burgareal. So schließt du Lücken, verstärkst geschwächte Abschnitte oder baust neue Schutzlinien.
+    </p>
+    <div class="warn">Neue Steine müssen an bestehende Mauern angrenzen, und du kannst den Zug erst beenden, wenn alle gekauften Steine gesetzt sind.</div>
+  </div>
+
+  <!-- STEP 9: Quick tips -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">9</div>
+      <div class="step-title">Schnell-Tipps für den Einstieg</div>
+    </div>
+    <p>
+      🎯 <strong>Wetterfahne als erstes Ziel:</strong> Zerstöre die gegnerische Wetterfahne früh — dann kennt er nur noch den ungefähren Wind, du dagegen (mit eigener Fahne) den genauen.<br><br>
+      🏗 <strong>Förderturm früh kaufen:</strong> 220 G Investition zahlt sich nach ~14 Runden aus. Zwei Türme bringen +32 G pro Runde netto.<br><br>
+      💥 <strong>Pulverkammer ist ein Jackpot:</strong> Ein Treffer in die feindliche Pulverkammer vernichtet den gesamten Pulvervorrat und löst eine Riesenexplosion aus, die Umgebungsmauern und -kammern mitreißt.<br><br>
+      🪖 <strong>Schrapnell gegen Hardware:</strong> Wenn du die gegnerischen Kanonen oder die Wetterfahne knacken willst, ist ein Schrapnell-Schuss (100 G) effizient — der Drift sorgt für eine Streuung, die einzelne kleine Ziele besser erwischt als ein einzelner Treffer.<br><br>
+
+      🛡 <strong>Thron schützen:</strong> Halte die Mauern des hinteren Bergfrieds (Thronseite) in gutem Zustand. Das ist dein letztes Leben.<br><br>
+      🎯 <strong>Flacher vs. steiler Winkel:</strong> Flach (20–30°) schießt weit, aber geradlinig — gut für freie Ziele. Steil (60–80°) trifft hinter Mauern, zum Beispiel in den Innenhof.
+    </p>
+  </div>
+
+  <hr class="divider">
+
+  <a class="back-btn" href="index.html">← ZURÜCK ZUM SPIEL</a>
+  <div class="legal-links"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a></div>
+
+</div>
+</body>
+</html>
