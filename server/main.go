@@ -37,6 +37,7 @@ func main() {
 	http.HandleFunc("/scoreboard", srv.handleScoreboard)
 	http.HandleFunc("/api/admin", srv.handleAdmin)
 	http.HandleFunc("/api/admin/teams", srv.handleAdminTeams)
+	http.HandleFunc("/api/admin/players", srv.handleAdminPlayers)
 	http.HandleFunc("/api/teams", srv.handleTeams)
 
 	log.Println("Ballerburg multiplayer server listening on :9092")

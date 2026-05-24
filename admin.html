@@ -96,6 +96,12 @@
     </div>
     <div id="teams-err" style="color:#f85149;margin-top:8px;font-size:0.78rem;min-height:1em"></div>
   </div>
+
+  <div class="box" style="margin-bottom:20px">
+    <div class="box-title">Players</div>
+    <table id="tbl-players"></table>
+    <div id="players-err" style="color:#f85149;margin-top:8px;font-size:0.78rem;min-height:1em"></div>
+  </div>
 </div>
 
 <script>
@@ -225,6 +231,43 @@ function render(d) {
           '</tr>';
         }).join('')
       : '<tr><td colspan="3" style="color:#8b949e;padding:12px 8px">Keine Teams</td></tr>');
+
+  // Players table — team is a dropdown that commits on change.
+  const players = d.players || [];
+  const selectStyle = 'background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:3px 6px;color:#c9d1d9;font-family:inherit;font-size:0.82rem;outline:none';
+  const teamOptions = teams.map(t => {
+    const tn = esc(t.name);
+    const tnAttr = tn.replace(/"/g, '&quot;');
+    return '<option value="' + tnAttr + '">' + tn + '</option>';
+  }).join('');
+  document.getElementById('tbl-players').innerHTML =
+    '<tr><th>Name</th><th style="width:200px">Team</th><th style="width:50px">W</th><th style="width:50px">L</th><th style="width:150px">Letztes Spiel</th><th style="width:200px">Aktion</th></tr>' +
+    (players.length
+      ? players.map(p => {
+          const nm = esc(p.name);
+          const nmAttr = nm.replace(/"/g, '&quot;');
+          const teamAttr = esc(p.team).replace(/"/g, '&quot;');
+          const last = p.last_played ? esc(p.last_played.slice(0, 16).replace('T', ' ')) : '<span style="color:#8b949e">—</span>';
+          const teamKnown = teams.some(t => t.name === p.team);
+          const driftOpt = teamKnown ? '' : '<option value="' + teamAttr + '">' + esc(p.team) + ' (?)</option>';
+          return '<tr>' +
+            '<td>' + nm + '</td>' +
+            '<td><select data-player="' + nmAttr + '" data-orig="' + teamAttr + '" onchange="savePlayerTeam(this)" style="' + selectStyle + '">' + driftOpt + teamOptions + '</select></td>' +
+            '<td>' + p.wins + '</td>' +
+            '<td>' + p.losses + '</td>' +
+            '<td>' + last + '</td>' +
+            '<td>' +
+              '<a href="#" onclick="renamePlayer(\'' + nmAttr + '\');return false" style="color:#58a6ff;margin-right:10px">Umbenennen</a>' +
+              '<a href="#" onclick="deletePlayer(\'' + nmAttr + '\');return false" style="color:#f85149">Löschen</a>' +
+            '</td>' +
+          '</tr>';
+        }).join('')
+      : '<tr><td colspan="6" style="color:#8b949e;padding:12px 8px">Keine Spieler</td></tr>');
+
+  // Set each select's value after insertion (so unknown-team drift shows blank rather than the wrong team).
+  document.querySelectorAll('#tbl-players select[data-player]').forEach(sel => {
+    sel.value = sel.getAttribute('data-orig');
+  });
 }
 
 function saveSort(el) {
@@ -290,6 +333,57 @@ function renameTeam(oldName) {
 function deleteTeam(name) {
   if (!confirm('Team "' + name + '" wirklich löschen?\n(Nur möglich, wenn keine Spieler/Spiele zugewiesen sind.)')) return;
   teamsMutate('DELETE', { name });
+}
+
+function playersErr(msg) {
+  document.getElementById('players-err').textContent = msg || '';
+}
+
+async function playersMutate(method, body) {
+  playersErr('');
+  try {
+    const url = '/api/admin/players' + (tok ? '?token=' + encodeURIComponent(tok) : '');
+    const r = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try {
+        const j = await r.json();
+        if (j && j.error) msg = j.error;
+      } catch (_) {}
+      playersErr(msg);
+      return false;
+    }
+    load();
+    return true;
+  } catch (e) {
+    playersErr(e.message);
+    return false;
+  }
+}
+
+function savePlayerTeam(el) {
+  const name = el.getAttribute('data-player');
+  const orig = el.getAttribute('data-orig');
+  const next = el.value;
+  if (next === orig) return;
+  playersMutate('PATCH', { old_name: name, team: next });
+}
+
+function renamePlayer(oldName) {
+  const newName = prompt('Neuer Name für "' + oldName + '":', oldName);
+  if (newName == null) return;
+  const trimmed = newName.trim();
+  if (!trimmed || trimmed === oldName) return;
+  playersMutate('PATCH', { old_name: oldName, new_name: trimmed });
+}
+
+function deletePlayer(name) {
+  if (!confirm('Spieler "' + name + '" wirklich löschen?\nAlle Spiele, Sessions und KI-Partien werden ebenfalls entfernt.')) return;
+  playersMutate('DELETE', { name });
 }
 
 function esc(s) {

@@ -54,6 +54,12 @@ var ErrTeamExists = errors.New("team already exists")
 // ErrTeamUnknown is returned when a rename/delete targets a team that doesn't exist.
 var ErrTeamUnknown = errors.New("team not found")
 
+// ErrPlayerUnknown is returned when a rename/delete targets a player that doesn't exist.
+var ErrPlayerUnknown = errors.New("player not found")
+
+// ErrPlayerExists is returned when renaming to a name that is already in use.
+var ErrPlayerExists = errors.New("player already exists")
+
 type Scoreboard struct {
 	db *sql.DB
 	// Serialise writes ourselves: SQLite handles concurrent reads but a busy
@@ -289,6 +295,153 @@ func (s *Scoreboard) DeleteTeam(name string) error {
 		return ErrTeamUnknown
 	}
 	return nil
+}
+
+// ListPlayersAdmin returns every player row, unsorted, for the admin UI. Unlike
+// Snapshot().Players this skips the team-totals roll-up so the admin always
+// sees every name even if it references a team that's since been deleted.
+func (s *Scoreboard) ListPlayersAdmin() ([]PlayerRow, error) {
+	rows, err := s.db.Query(`
+		SELECT name, team, wins, losses,
+		       COALESCE(strftime('%Y-%m-%dT%H:%M:%SZ', last_played), '')
+		FROM players
+		ORDER BY LOWER(name)
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []PlayerRow{}
+	for rows.Next() {
+		var p PlayerRow
+		if err := rows.Scan(&p.Name, &p.Team, &p.Wins, &p.Losses, &p.LastPlayed); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// RenamePlayer renames a player and cascades the change through every row that
+// references the name (matches.winner/loser, ai_matches.player, sessions.player)
+// in a single transaction.
+func (s *Scoreboard) RenamePlayer(oldName, newName string) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+
+	if oldName == newName {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var exists int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM players WHERE name = ?`, oldName).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return ErrPlayerUnknown
+	}
+	if !strings.EqualFold(oldName, newName) {
+		var clash int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM players WHERE name = ?`, newName).Scan(&clash); err != nil {
+			return err
+		}
+		if clash > 0 {
+			return ErrPlayerExists
+		}
+	}
+
+	if _, err := tx.Exec(`UPDATE players SET name = ? WHERE name = ?`, newName, oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE matches SET winner = ? WHERE winner = ?`, newName, oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE matches SET loser = ? WHERE loser = ?`, newName, oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE sessions SET player = ? WHERE player = ?`, newName, oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE ai_matches SET player = ? WHERE player = ?`, newName, oldName); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// SetPlayerTeam reassigns a player to a different team and updates every
+// match/session row that records the player's team alongside their name.
+func (s *Scoreboard) SetPlayerTeam(name, team string) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+
+	var teamExists int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM teams WHERE name = ?`, team).Scan(&teamExists); err != nil {
+		return err
+	}
+	if teamExists == 0 {
+		return ErrTeamUnknown
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`UPDATE players SET team = ? WHERE name = ?`, team, name)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrPlayerUnknown
+	}
+	if _, err := tx.Exec(`UPDATE matches SET winner_team = ? WHERE winner = ?`, team, name); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE matches SET loser_team = ? WHERE loser = ?`, team, name); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE sessions SET team = ? WHERE player = ?`, team, name); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// DeletePlayer removes a player and every match/session/ai_match row that
+// references their name. Used by the admin UI to purge offensive names.
+func (s *Scoreboard) DeletePlayer(name string) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`DELETE FROM players WHERE name = ?`, name)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrPlayerUnknown
+	}
+	if _, err := tx.Exec(`DELETE FROM matches WHERE winner = ? OR loser = ?`, name, name); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM sessions WHERE player = ?`, name); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM ai_matches WHERE player = ?`, name); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // CheckTeam is the team-lock guard for persisted scoreboard names. It does not
@@ -532,6 +685,9 @@ func (s *Scoreboard) SnapshotAdmin(live LiveStats) (AdminSnapshot, error) {
 	}
 	if teams, err := s.ListTeams(); err == nil {
 		snap.Teams = teams
+	}
+	if players, err := s.ListPlayersAdmin(); err == nil {
+		snap.Players = players
 	}
 
 	// Active players: sessions still open within the last 2h (handles restarts).
