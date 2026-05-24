@@ -35,6 +35,7 @@ type AdminSnapshot struct {
 	GameTypeBreakdown    map[string]int  `json:"game_type_breakdown"`
 	TopPlayersBySessions []SessionPlayer `json:"top_players_by_sessions"`
 	Teams                []TeamMeta      `json:"teams"`
+	Players              []PlayerRow     `json:"players"`
 }
 
 type DayCount struct {
@@ -243,5 +244,114 @@ func writeAdminTeamsTypedError(w http.ResponseWriter, err error) {
 	default:
 		log.Printf("admin teams: %v", err)
 		writeAdminTeamsError(w, http.StatusInternalServerError, "internal error")
+	}
+}
+
+type playerRequest struct {
+	Name    string `json:"name"`
+	OldName string `json:"old_name"`
+	NewName string `json:"new_name"`
+	Team    string `json:"team"`
+}
+
+// handleAdminPlayers handles PATCH/DELETE on /api/admin/players. Same token
+// gate as /api/admin. No POST — player rows are created by completed matches,
+// not by the admin.
+func (s *Server) handleAdminPlayers(w http.ResponseWriter, r *http.Request) {
+	token := os.Getenv("BALLERBURG_ADMIN_TOKEN")
+	if token == "" || r.URL.Query().Get("token") != token {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if s.scoreboard == nil {
+		http.Error(w, "scoreboard unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req playerRequest
+	if r.Method == http.MethodPatch || r.Method == http.MethodDelete {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid json: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+
+	switch r.Method {
+	case http.MethodPatch:
+		old, err := validatePlayerName(req.OldName)
+		if err != nil {
+			writeAdminPlayersError(w, http.StatusBadRequest, "old_name: "+err.Error())
+			return
+		}
+		current := old
+		if strings.TrimSpace(req.NewName) != "" {
+			newName, err := validatePlayerName(req.NewName)
+			if err != nil {
+				writeAdminPlayersError(w, http.StatusBadRequest, "new_name: "+err.Error())
+				return
+			}
+			if err := s.scoreboard.RenamePlayer(old, newName); err != nil {
+				writeAdminPlayersTypedError(w, err)
+				return
+			}
+			current = newName
+		}
+		if strings.TrimSpace(req.Team) != "" {
+			team := strings.TrimSpace(req.Team)
+			if err := s.scoreboard.SetPlayerTeam(current, team); err != nil {
+				writeAdminPlayersTypedError(w, err)
+				return
+			}
+		}
+	case http.MethodDelete:
+		name, err := validatePlayerName(req.Name)
+		if err != nil {
+			writeAdminPlayersError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := s.scoreboard.DeletePlayer(name); err != nil {
+			writeAdminPlayersTypedError(w, err)
+			return
+		}
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	players, _ := s.scoreboard.ListPlayersAdmin()
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "players": players})
+}
+
+// validatePlayerName matches the cap enforced by wshandler.go on incoming names.
+func validatePlayerName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", errors.New("name required")
+	}
+	if len(name) > 32 {
+		return "", errors.New("name too long (max 32 chars)")
+	}
+	return name, nil
+}
+
+func writeAdminPlayersError(w http.ResponseWriter, status int, msg string) {
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+func writeAdminPlayersTypedError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrPlayerExists):
+		writeAdminPlayersError(w, http.StatusConflict, "player name already exists")
+	case errors.Is(err, ErrPlayerUnknown):
+		writeAdminPlayersError(w, http.StatusNotFound, "player not found")
+	case errors.Is(err, ErrTeamUnknown):
+		writeAdminPlayersError(w, http.StatusBadRequest, "team does not exist")
+	default:
+		log.Printf("admin players: %v", err)
+		writeAdminPlayersError(w, http.StatusInternalServerError, "internal error")
 	}
 }
