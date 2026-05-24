@@ -503,8 +503,8 @@ const aiMode = sessionStorage.getItem('bb_game_ai') || params.get('ai') || ''; /
 const hasPlayerIdentity = !!(playerName && playerTeam);
 if (!hasPlayerIdentity) {
   // Missing team is just as fatal as missing name now — bounce back so the
-  // user can pick a Fakultät on index.html.
-  window.location.href = 'index.html?error=' + encodeURIComponent('Bitte Pseudonym und Fakultät wählen.');
+  // user can pick a Team on index.html.
+  window.location.href = 'index.html?error=' + encodeURIComponent('Bitte Pseudonym und Team wählen.');
 } else {
   sessionStorage.setItem('bb_game_name', playerName);
   sessionStorage.setItem('bb_game_team', playerTeam);

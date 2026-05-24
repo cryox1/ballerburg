@@ -211,10 +211,7 @@ body {
   <h1>&#x1F3F0; BALLERBURG &#x1F3F0;</h1>
   <input id="username" placeholder="Pseudonym" maxlength="32" autocomplete="off">
   <select id="team">
-    <option value="">— Fakultät wählen —</option>
-    <option value="Wirtschaftsinformatik">Wirtschaftsinformatik</option>
-    <option value="Informatik">Informatik</option>
-    <option value="Sonstiges">Sonstiges</option>
+    <option value="">— Team wählen —</option>
   </select>
   <div class="data-note">Nutze ein Pseudonym. Abgeschlossene Spiele können mit Pseudonym und Team in der öffentlichen Bestenliste erscheinen.</div>
   <label class="remember-row" for="remember">
@@ -251,8 +248,28 @@ body {
 const $ = id => document.getElementById(id);
 const setStatus = txt => { $('status').textContent = txt; };
 
-const ALLOWED_TEAMS = ['Wirtschaftsinformatik', 'Informatik', 'Sonstiges'];
+let ALLOWED_TEAMS = [];
 const REMEMBER_KEY = 'bb_remember';
+
+// Populate the team dropdown from the server so admins can edit the list at
+// runtime. Saved-preferences restore (further down) waits on this resolving.
+const teamsReady = (async () => {
+  try {
+    const r = await fetch('/api/teams', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const list = await r.json();
+    ALLOWED_TEAMS = list.map(t => t.name);
+    const sel = $('team');
+    for (const t of list) {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    setStatus('Teams konnten nicht geladen werden: ' + e.message);
+  }
+})();
 
 function clearRememberedPrefs() {
   localStorage.removeItem(REMEMBER_KEY);
@@ -283,8 +300,11 @@ const rememberEnabled = localStorage.getItem(REMEMBER_KEY) === '1';
 $('remember').checked = rememberEnabled;
 if (rememberEnabled) {
   $('username').value = localStorage.getItem('bb_name') || '';
-  const savedTeam = localStorage.getItem('bb_team') || '';
-  if (ALLOWED_TEAMS.includes(savedTeam)) $('team').value = savedTeam;
+  // Wait for the dropdown to populate before restoring the saved team value.
+  teamsReady.then(() => {
+    const savedTeam = localStorage.getItem('bb_team') || '';
+    if (ALLOWED_TEAMS.includes(savedTeam)) $('team').value = savedTeam;
+  });
 }
 $('remember').addEventListener('change', () => {
   if (!$('remember').checked) clearRememberedPrefs();
@@ -303,7 +323,7 @@ function getNameTeam() {
   if (!name) { setStatus('Bitte gib einen Namen ein.'); return null; }
   if (name.length > 32) { setStatus('Name maximal 32 Zeichen.'); return null; }
   const team = $('team').value;
-  if (!ALLOWED_TEAMS.includes(team)) { setStatus('Bitte wähle eine Fakultät.'); return null; }
+  if (!ALLOWED_TEAMS.includes(team)) { setStatus('Bitte wähle ein Team.'); return null; }
   return { name, team };
 }
 

@@ -82,6 +82,20 @@
       <table id="tbl-top"></table>
     </div>
   </div>
+
+  <div class="box" style="margin-bottom:20px">
+    <div class="box-title">Teams</div>
+    <table id="tbl-teams"></table>
+    <div id="teams-form" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input id="new-team-name" placeholder="Team-Name" maxlength="32"
+             style="flex:1;min-width:160px;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:6px 10px;color:#c9d1d9;font-family:inherit;font-size:0.85rem;outline:none">
+      <input id="new-team-sort" type="number" value="0" title="Sort order"
+             style="width:80px;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:6px 10px;color:#c9d1d9;font-family:inherit;font-size:0.85rem;outline:none">
+      <button onclick="addTeam()"
+              style="background:#238636;border:none;border-radius:4px;color:#fff;padding:6px 16px;cursor:pointer;font-family:inherit;font-size:0.85rem">Hinzufügen</button>
+    </div>
+    <div id="teams-err" style="color:#f85149;margin-top:8px;font-size:0.78rem;min-height:1em"></div>
+  </div>
 </div>
 
 <script>
@@ -189,6 +203,93 @@ function render(d) {
     (tp.length
       ? tp.map((p,i) => '<tr><td>' + (i+1) + '</td><td>' + esc(p.name) + '</td><td>' + p.count + '</td></tr>').join('')
       : '<tr><td colspan="3" style="color:#8b949e;padding:12px 8px">No sessions recorded yet</td></tr>');
+
+  // Teams table — sort cell is an inline editable input; commits on Enter or blur.
+  const teams = d.teams || [];
+  const inputStyle = 'width:60px;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:3px 6px;color:#c9d1d9;font-family:inherit;font-size:0.82rem;outline:none';
+  document.getElementById('tbl-teams').innerHTML =
+    '<tr><th>Name</th><th style="width:90px">Sort</th><th style="width:200px">Aktion</th></tr>' +
+    (teams.length
+      ? teams.map(t => {
+          const nm = esc(t.name);
+          const nmAttr = nm.replace(/"/g, '&quot;');
+          return '<tr>' +
+            '<td>' + nm + '</td>' +
+            '<td><input type="number" value="' + t.sort_order + '" data-team="' + nmAttr + '" data-orig="' + t.sort_order + '"' +
+              ' onchange="saveSort(this)" onkeydown="if(event.key===\'Enter\'){this.blur();}"' +
+              ' style="' + inputStyle + '"></td>' +
+            '<td>' +
+              '<a href="#" onclick="renameTeam(\'' + nmAttr + '\');return false" style="color:#58a6ff;margin-right:10px">Umbenennen</a>' +
+              '<a href="#" onclick="deleteTeam(\'' + nmAttr + '\');return false" style="color:#f85149">Löschen</a>' +
+            '</td>' +
+          '</tr>';
+        }).join('')
+      : '<tr><td colspan="3" style="color:#8b949e;padding:12px 8px">Keine Teams</td></tr>');
+}
+
+function saveSort(el) {
+  const name = el.getAttribute('data-team');
+  const orig = parseInt(el.getAttribute('data-orig'), 10);
+  const next = parseInt(el.value, 10);
+  if (isNaN(next) || next === orig) {
+    el.value = orig;
+    return;
+  }
+  teamsMutate('PATCH', { old_name: name, sort_order: next });
+}
+
+function teamsErr(msg) {
+  document.getElementById('teams-err').textContent = msg || '';
+}
+
+async function teamsMutate(method, body) {
+  teamsErr('');
+  try {
+    const url = '/api/admin/teams' + (tok ? '?token=' + encodeURIComponent(tok) : '');
+    const r = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try {
+        const j = await r.json();
+        if (j && j.error) msg = j.error;
+      } catch (_) {}
+      teamsErr(msg);
+      return false;
+    }
+    load();
+    return true;
+  } catch (e) {
+    teamsErr(e.message);
+    return false;
+  }
+}
+
+function addTeam() {
+  const name = document.getElementById('new-team-name').value.trim();
+  if (!name) { teamsErr('Bitte Name eingeben.'); return; }
+  const sort = parseInt(document.getElementById('new-team-sort').value, 10) || 0;
+  teamsMutate('POST', { name, sort_order: sort }).then(ok => {
+    if (ok) {
+      document.getElementById('new-team-name').value = '';
+    }
+  });
+}
+
+function renameTeam(oldName) {
+  const newName = prompt('Neuer Name für "' + oldName + '":', oldName);
+  if (newName == null) return;
+  const trimmed = newName.trim();
+  if (!trimmed || trimmed === oldName) return;
+  teamsMutate('PATCH', { old_name: oldName, new_name: trimmed });
+}
+
+function deleteTeam(name) {
+  if (!confirm('Team "' + name + '" wirklich löschen?\n(Nur möglich, wenn keine Spieler/Spiele zugewiesen sind.)')) return;
+  teamsMutate('DELETE', { name });
 }
 
 function esc(s) {

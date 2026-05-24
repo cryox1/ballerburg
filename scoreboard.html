@@ -62,9 +62,6 @@ th {
 }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr:last-child td { border-bottom: none; }
-tr.team-Wirtschaftsinformatik td:first-child::before { content: "\1F4BC  "; }
-tr.team-Informatik td:first-child::before          { content: "\1F4BB  "; }
-tr.team-Sonstiges td:first-child::before           { content: "\1F3F0  "; }
 .rank { color: #ffd700; font-weight: bold; }
 .empty {
   text-align: center;
@@ -103,13 +100,13 @@ tr.team-Sonstiges td:first-child::before           { content: "\1F3F0  "; }
 <body>
 <div id="wrap">
   <h1>&#x1F3C6; BESTENLISTE</h1>
-  <div class="subtitle">Fakultäten-Wettkampf</div>
+  <div class="subtitle">Team-Wettkampf</div>
 
-  <h2>Fakultäten</h2>
+  <h2>Teams</h2>
   <table id="teams-table">
     <thead>
       <tr>
-        <th>Fakultät</th>
+        <th>Team</th>
         <th class="num">Siege</th>
         <th class="num">Niederlagen</th>
         <th class="num">Quote</th>
@@ -126,7 +123,7 @@ tr.team-Sonstiges td:first-child::before           { content: "\1F3F0  "; }
       <tr>
         <th class="num">#</th>
         <th>Name</th>
-        <th>Fakultät</th>
+        <th>Team</th>
         <th class="num">Siege</th>
         <th class="num">Niederlagen</th>
       </tr>
