@@ -105,8 +105,15 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name required (max 32 chars)", http.StatusBadRequest)
 		return
 	}
-	if !IsAllowedTeam(team) {
-		http.Error(w, "team required: must be one of Wirtschaftsinformatik, Informatik, Sonstiges", http.StatusBadRequest)
+	if s.scoreboard == nil {
+		http.Error(w, "scoreboard unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if ok, err := s.scoreboard.IsAllowedTeam(team); err != nil {
+		http.Error(w, "team lookup failed", http.StatusInternalServerError)
+		return
+	} else if !ok {
+		http.Error(w, "team required: unknown team", http.StatusBadRequest)
 		return
 	}
 	if ai != "" && ai != "easy" && ai != "medium" && ai != "hard" {

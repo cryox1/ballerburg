@@ -28,26 +28,31 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// AllowedTeams are the only team values the server accepts.
-var AllowedTeams = []string{
-	"Wirtschaftsinformatik",
-	"Informatik",
-	"Sonstiges",
-}
-
-func IsAllowedTeam(t string) bool {
-	for _, a := range AllowedTeams {
-		if a == t {
-			return true
-		}
-	}
-	return false
+// defaultTeams are seeded into the `teams` table on first boot. After that the
+// list is fully editable from the admin panel.
+var defaultTeams = []struct {
+	Name      string
+	SortOrder int
+}{
+	{"Wirtschaftsinformatik", 0},
+	{"Informatik", 1},
+	{"Sonstiges", 2},
 }
 
 // ErrTeamMismatch is returned by CheckTeam/ensurePlayerTx when a name already exists
 // with a different team. The error message includes the registered team so
 // the client can show a useful hint.
 var ErrTeamMismatch = errors.New("team mismatch")
+
+// ErrTeamInUse is returned by DeleteTeam when players/matches/sessions still
+// reference the team being deleted. Admin must reassign first.
+var ErrTeamInUse = errors.New("team in use")
+
+// ErrTeamExists is returned when trying to add/rename to a name that already exists.
+var ErrTeamExists = errors.New("team already exists")
+
+// ErrTeamUnknown is returned when a rename/delete targets a team that doesn't exist.
+var ErrTeamUnknown = errors.New("team not found")
 
 type Scoreboard struct {
 	db *sql.DB
@@ -101,10 +106,24 @@ CREATE TABLE IF NOT EXISTS sessions (
   ended_at      DATETIME,
   duration_secs INTEGER
 );
+CREATE TABLE IF NOT EXISTS teams (
+  name       TEXT PRIMARY KEY COLLATE NOCASE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("init schema: %w", err)
+	}
+	for _, t := range defaultTeams {
+		if _, err := db.Exec(
+			`INSERT OR IGNORE INTO teams(name, sort_order) VALUES(?, ?)`,
+			t.Name, t.SortOrder,
+		); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("seed teams: %w", err)
+		}
 	}
 	return &Scoreboard{db: db}, nil
 }
@@ -114,6 +133,162 @@ func (s *Scoreboard) Close() error {
 		return nil
 	}
 	return s.db.Close()
+}
+
+// TeamMeta is the JSON shape of a team row.
+type TeamMeta struct {
+	Name      string `json:"name"`
+	SortOrder int    `json:"sort_order"`
+}
+
+func (s *Scoreboard) ListTeams() ([]TeamMeta, error) {
+	rows, err := s.db.Query(`SELECT name, sort_order FROM teams ORDER BY sort_order, name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []TeamMeta{}
+	for rows.Next() {
+		var t TeamMeta
+		if err := rows.Scan(&t.Name, &t.SortOrder); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// IsAllowedTeam reports whether the given team name exists in the teams table.
+// Lookup is case-insensitive (the column uses COLLATE NOCASE).
+func (s *Scoreboard) IsAllowedTeam(name string) (bool, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM teams WHERE name = ?`, name).Scan(&n)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+func (s *Scoreboard) AddTeam(name string, sortOrder int) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+	res, err := s.db.Exec(
+		`INSERT OR IGNORE INTO teams(name, sort_order) VALUES(?, ?)`,
+		name, sortOrder,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrTeamExists
+	}
+	return nil
+}
+
+func (s *Scoreboard) UpdateTeamSort(name string, sortOrder int) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+	res, err := s.db.Exec(`UPDATE teams SET sort_order = ? WHERE name = ?`, sortOrder, name)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrTeamUnknown
+	}
+	return nil
+}
+
+// RenameTeam renames a team and cascades the change through every row that
+// references it (players.team, matches.winner_team/loser_team, sessions.team)
+// in a single transaction. The old and new names are compared case-insensitively
+// for the existence check, so renaming "Sonstiges" -> "sonstiges" is allowed.
+func (s *Scoreboard) RenameTeam(oldName, newName string) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+
+	if oldName == newName {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Verify the source exists.
+	var exists int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM teams WHERE name = ?`, oldName).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return ErrTeamUnknown
+	}
+	// Reject if the new name collides with a different existing team.
+	if !strings.EqualFold(oldName, newName) {
+		var clash int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM teams WHERE name = ?`, newName).Scan(&clash); err != nil {
+			return err
+		}
+		if clash > 0 {
+			return ErrTeamExists
+		}
+	}
+
+	if _, err := tx.Exec(`UPDATE teams SET name = ? WHERE name = ?`, newName, oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE players SET team = ? WHERE team = ?`, newName, oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE matches SET winner_team = ? WHERE winner_team = ?`, newName, oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE matches SET loser_team = ? WHERE loser_team = ?`, newName, oldName); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE sessions SET team = ? WHERE team = ?`, newName, oldName); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// DeleteTeam removes a team. Fails with ErrTeamInUse if any player/match/session
+// still references it.
+func (s *Scoreboard) DeleteTeam(name string) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+
+	for _, q := range []string{
+		`SELECT COUNT(*) FROM players WHERE team = ?`,
+		`SELECT COUNT(*) FROM matches WHERE winner_team = ? OR loser_team = ?`,
+		`SELECT COUNT(*) FROM sessions WHERE team = ?`,
+	} {
+		var n int
+		var err error
+		if strings.Contains(q, "OR") {
+			err = s.db.QueryRow(q, name, name).Scan(&n)
+		} else {
+			err = s.db.QueryRow(q, name).Scan(&n)
+		}
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			return ErrTeamInUse
+		}
+	}
+	res, err := s.db.Exec(`DELETE FROM teams WHERE name = ?`, name)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrTeamUnknown
+	}
+	return nil
 }
 
 // CheckTeam is the team-lock guard for persisted scoreboard names. It does not
@@ -243,8 +418,10 @@ func (s *Scoreboard) Snapshot() (ScoreboardSnapshot, error) {
 	defer rows.Close()
 
 	teamTotals := map[string]*TeamRow{}
-	for _, t := range AllowedTeams {
-		teamTotals[t] = &TeamRow{Team: t}
+	if teams, err := s.ListTeams(); err == nil {
+		for _, t := range teams {
+			teamTotals[t.Name] = &TeamRow{Team: t.Name}
+		}
 	}
 
 	for rows.Next() {
@@ -351,6 +528,10 @@ func (s *Scoreboard) SnapshotAdmin(live LiveStats) (AdminSnapshot, error) {
 		GameTypeBreakdown:    map[string]int{},
 		DailyMatches:         []DayCount{},
 		TopPlayersBySessions: []SessionPlayer{},
+		Teams:                []TeamMeta{},
+	}
+	if teams, err := s.ListTeams(); err == nil {
+		snap.Teams = teams
 	}
 
 	// Active players: sessions still open within the last 2h (handles restarts).
