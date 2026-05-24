@@ -1,0 +1,175 @@
+<!-- Copyright 2026 Jonas Bartel -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ballerburg - Datenschutz</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: #1a0a00;
+  font-family: 'Courier New', monospace;
+  color: #f0d080;
+  padding: 30px 16px 60px;
+}
+.page {
+  max-width: 820px;
+  margin: 0 auto;
+}
+h1 {
+  font-size: 2rem;
+  color: #ffd700;
+  text-shadow: 0 0 16px #ff8800;
+  letter-spacing: 0.12em;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.subtitle {
+  text-align: center;
+  color: #a06030;
+  margin-bottom: 28px;
+  letter-spacing: 0.1em;
+}
+section {
+  background: #2a1400;
+  border: 2px solid #8b4513;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+h2 {
+  color: #ffcc88;
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+p { line-height: 1.65; margin-bottom: 10px; }
+ul { padding-left: 22px; margin: 10px 0; }
+li { line-height: 1.55; margin-bottom: 6px; }
+a { color: #88ddff; }
+code {
+  background: #1a0a00;
+  border: 1px solid #553311;
+  color: #ffd700;
+  padding: 1px 4px;
+}
+.notice { color: #ffbb88; }
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+.btn {
+  background: #553300;
+  color: #ffcc88;
+  border: 2px solid #aa7733;
+  padding: 12px 24px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.btn:hover { background: #774400; }
+</style>
+</head>
+<body>
+<main class="page">
+  <h1>DATENSCHUTZ</h1>
+  <div class="subtitle">Datenschutzerklärung für Ballerburg</div>
+
+  <section>
+    <h2>Verantwortlicher</h2>
+    <p>
+      Jonas Bartel<br>
+      Frühlingstraße 14<br>
+      86570 Inchenhofen<br>
+      Deutschland
+    </p>
+    <p class="notice">E-Mail: me@j-bartel.de</p>
+  </section>
+
+  <section>
+    <h2>Kurzfassung</h2>
+    <p>Ballerburg ist ein nicht-kommerzielles Browser-Spiel ohne Werbung, Tracking, externe Schriftarten, Analyse-Dienste oder Cookies.</p>
+    <p>Das Spiel verarbeitet nur Daten, die für Spielbetrieb, Mehrspieler-Lobbys und Bestenliste erforderlich sind. Bitte verwende ein Pseudonym statt deines echten Namens, wenn du nicht öffentlich erkennbar sein möchtest.</p>
+  </section>
+
+  <section>
+    <h2>Hosting</h2>
+    <p>Die Website wird auf einem VPS bei Hetzner gehostet:</p>
+    <p>Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Deutschland.</p>
+    <p>Beim Abruf der Website und beim Aufbau einer WebSocket-Verbindung verarbeitet der Server technisch notwendige Verbindungsdaten, insbesondere IP-Adresse, Zeitpunkt, angefragte Ressource, HTTP-Status und technische Browser-/Verbindungsinformationen. Der nginx-Zugriffslog des Spiels ist deaktiviert; technische Fehler- und Systemlogs können zur Störungsanalyse trotzdem anfallen.</p>
+    <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO. Das berechtigte Interesse ist der sichere und störungsarme Betrieb des Spiels.</p>
+  </section>
+
+  <section>
+    <h2>Spielbetrieb</h2>
+    <p>Wenn du eine Lobby erstellst, beitrittst oder gegen den Computer spielst, verarbeitet Ballerburg folgende Daten:</p>
+    <ul>
+      <li>Pseudonym und gewählte Fakultät/Team</li>
+      <li>Lobby-Code und Verbindungsstatus</li>
+      <li>Spielzustand, Spielzüge, Treffer, Runden, Ressourcen und Ergebnis</li>
+      <li>Schwierigkeitsgrad bei Spielen gegen den Computer</li>
+    </ul>
+    <p>Diese Daten werden für die laufende Lobby im Arbeitsspeicher verarbeitet. Lobbys laufen maximal etwa zwei Stunden und werden danach entfernt.</p>
+    <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO. Das berechtigte Interesse ist, das ausdrücklich angeforderte Spiel bereitzustellen.</p>
+  </section>
+
+  <section>
+    <h2>Bestenliste</h2>
+    <p>Nach abgeschlossenen Spielen können Ergebnisse in einer SQLite-Datenbank gespeichert und öffentlich in der Bestenliste angezeigt werden.</p>
+    <p>Bei Mehrspieler-Spielen werden Pseudonym, Fakultät/Team, Siege, Niederlagen und letzter Spielzeitpunkt gespeichert. Bei Spielen gegen den Computer werden Pseudonym, Schwierigkeitsgrad und Sieg/Niederlage gespeichert.</p>
+    <p>Die Bestenliste ist öffentlich abrufbar. Wenn ein Eintrag gelöscht oder geändert werden soll, kontaktiere den Verantwortlichen.</p>
+    <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO. Das berechtigte Interesse ist eine transparente, freiwillige Spielstatistik fuer dieses Hobbyprojekt.</p>
+  </section>
+
+  <section>
+    <h2>Browser-Speicher</h2>
+    <p>Ballerburg setzt keine Cookies.</p>
+    <p>Für die aktive Spielsitzung nutzt der Browser <code>sessionStorage</code>, damit Pseudonym, Team, Lobby-Code und KI-Schwierigkeit nicht in der sichtbaren URL stehen müssen. Diese Daten bleiben grundsätzlich nur für den aktuellen Browser-Tab bzw. die aktuelle Browser-Sitzung erhalten. Dies ist technisch erforderlich, um den gewünschten digitalen Dienst bereitzustellen (§ 25 Abs. 2 Nr. 2 TDDDG).</p>
+    <p>Wenn du auf der Startseite die Option "Auf diesem Gerät merken" aktivierst, speichert der Browser Pseudonym, Team und KI-Schwierigkeit in <code>localStorage</code>. Das ist freiwillig und dient nur der Komfortfunktion. Du kannst die Option jederzeit deaktivieren oder die Browserdaten löschen. Rechtsgrundlage ist deine Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TDDDG.</p>
+  </section>
+
+  <section>
+    <h2>Empfaenger</h2>
+    <p>Technische Daten werden beim Hosting durch Hetzner verarbeitet. Andere Spieler in derselben Lobby sehen dein Pseudonym, dein Team und den Spielverlauf. Besucher der Bestenliste sehen dort veröffentlichte Ergebnisdaten.</p>
+    <p>Eine Weitergabe zu Werbe-, Tracking- oder Analysezwecken findet nicht statt. Es werden keine externen Skripte, Analyseanbieter oder Werbenetzwerke eingebunden.</p>
+  </section>
+
+  <section>
+    <h2>Speicherdauer</h2>
+    <p>Aktive Lobbydaten werden nach Ablauf der Lobby entfernt. Bestenlisten-Einträge bleiben gespeichert, bis sie für den Zweck nicht mehr erforderlich sind oder eine berechtigte Löschanfrage umgesetzt wird. Technische Fehlerlogs werden nur so lange aufbewahrt, wie sie für Betrieb, Sicherheit und Fehlerbehebung erforderlich sind.</p>
+  </section>
+
+  <section>
+    <h2>Deine Rechte</h2>
+    <p>Du hast nach der DSGVO insbesondere Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch gegen Verarbeitungen auf Grundlage berechtigter Interessen. Soweit eine Verarbeitung auf Einwilligung beruht, kannst du diese Einwilligung jederzeit für die Zukunft widerrufen.</p>
+    <p>Du hast außerdem das Recht, dich bei einer Datenschutzaufsichtsbehörde zu beschweren. Für private Anbieter in Bayern ist regelmäßig das Bayerische Landesamt für Datenschutzaufsicht, Promenade 18, 91522 Ansbach, zuständig.</p>
+  </section>
+
+  <section>
+    <h2>Pflichtangaben</h2>
+    <p>Die Angabe eines Pseudonyms und eines Teams ist erforderlich, um am Spiel teilzunehmen. Die optionale Speicherung auf deinem Geraet ist nicht erforderlich.</p>
+    <p>Es findet keine automatisierte Entscheidungsfindung mit rechtlicher oder vergleichbar erheblicher Wirkung statt. Die Spiel-KI und die Spielregeln beeinflussen nur den Spielverlauf.</p>
+  </section>
+
+  <section>
+    <h2>Stand</h2>
+    <p>12. Mai 2026</p>
+  </section>
+
+  <div class="actions">
+    <a class="btn" href="index.html">Zurück</a>
+    <a class="btn" href="impressum.html">Impressum</a>
+  </div>
+</main>
+</body>
+</html>

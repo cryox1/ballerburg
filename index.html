@@ -1,0 +1,373 @@
+<!-- Copyright 2026 Jonas Bartel -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ballerburg — Multiplayer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: #1a0a00;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier New', monospace;
+  color: #f0d080;
+}
+#menu {
+  text-align: center;
+  max-width: 500px;
+  width: 90vw;
+}
+#menu h1 {
+  font-size: 2.5rem;
+  color: #ffd700;
+  text-shadow: 0 0 20px #ff8800;
+  letter-spacing: 0.3em;
+  margin-bottom: 30px;
+  white-space: nowrap;
+}
+#menu input,
+#menu select {
+  background: #2a1400;
+  color: #ffd700;
+  border: 2px solid #8b4513;
+  padding: 12px 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  width: 100%;
+  margin-bottom: 12px;
+}
+#menu input::placeholder { color: #a06030; }
+#menu select { cursor: pointer; }
+.btn-row { display: flex; gap: 10px; margin-bottom: 20px; }
+.menu-btn {
+  flex: 1;
+  padding: 14px 20px;
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+  border: 2px solid;
+  text-transform: uppercase;
+  transition: background 0.1s;
+}
+.btn-create {
+  background: #553300;
+  color: #ffcc88;
+  border-color: #aa7733;
+}
+.btn-create:hover { background: #774400; }
+.btn-join {
+  background: #004466;
+  color: #7fdfff;
+  border-color: #3399cc;
+}
+.btn-join:hover { background: #006688; }
+.btn-scoreboard {
+  background: #3a2200;
+  color: #ffcc55;
+  border-color: #aa8833;
+  width: 100%;
+  margin-bottom: 12px;
+}
+.btn-scoreboard:hover { background: #553300; }
+.btn-ai {
+  background: #2a0040;
+  color: #d8a8ff;
+  border-color: #884ddd;
+  width: 100%;
+  margin-bottom: 20px;
+}
+.btn-ai:hover { background: #3a0070; }
+.btn-tutorial {
+  background: #001a2a;
+  color: #88ddff;
+  border-color: #1a6688;
+  width: 100%;
+  margin-bottom: 20px;
+}
+.btn-tutorial:hover { background: #003344; }
+#join-section, #ai-section {
+  display: none;
+  margin-bottom: 20px;
+}
+#join-section input {
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+#ai-section .diff-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#ai-section .diff-opt {
+  flex: 1;
+  background: #2a1400;
+  border: 2px solid #8b4513;
+  padding: 10px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f0d080;
+  transition: background 0.1s, border-color 0.1s;
+}
+#ai-section .diff-opt:hover { background: #3a2000; }
+#ai-section .diff-opt.selected {
+  background: #553300;
+  border-color: #ffd700;
+  color: #ffd700;
+}
+#status {
+  font-size: 0.85rem;
+  color: #a06030;
+  min-height: 1.5em;
+  margin-top: 12px;
+}
+.data-note {
+  color: #c08050;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: -2px 0 12px;
+}
+.remember-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #c08050;
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+  cursor: pointer;
+  padding: 12px 16px;
+  background: #2a1400;
+  border: 2px solid #8b4513;
+  border-radius: 4px;
+  width: 100%;
+  min-height: 48px;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  user-select: none;
+}
+.remember-row:hover { background: #3a2000; }
+.remember-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.remember-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  background: #1a0a00;
+  border: 1px solid #8b4513;
+  border-radius: 10px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.remember-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: #8b4513;
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.remember-row input:checked ~ .remember-toggle {
+  background: #553300;
+  border-color: #ffd700;
+}
+.remember-row input:checked ~ .remember-toggle::after {
+  transform: translateX(16px);
+  background: #ffd700;
+}
+.remember-row:has(input:checked) {
+  border-color: #aa7733;
+  color: #ffd700;
+}
+.remember-label { flex: 1; text-align: left; }
+.legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 18px;
+  font-size: 0.78rem;
+}
+.legal-links a { color: #a06030; text-decoration: none; }
+.legal-links a:hover { color: #ffcc88; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div id="menu">
+  <h1>&#x1F3F0; BALLERBURG &#x1F3F0;</h1>
+  <input id="username" placeholder="Pseudonym" maxlength="32" autocomplete="off">
+  <select id="team">
+    <option value="">— Fakultät wählen —</option>
+    <option value="Wirtschaftsinformatik">Wirtschaftsinformatik</option>
+    <option value="Informatik">Informatik</option>
+    <option value="Sonstiges">Sonstiges</option>
+  </select>
+  <div class="data-note">Nutze ein Pseudonym. Abgeschlossene Spiele können mit Pseudonym und Team in der öffentlichen Bestenliste erscheinen.</div>
+  <label class="remember-row" for="remember">
+  <input type="checkbox" id="remember">
+  <span class="remember-toggle"></span>
+  <span class="remember-label">Auf diesem Gerät merken</span>
+</label>
+  <div class="btn-row">
+    <button class="menu-btn btn-create" onclick="createLobby()">LOBBY ERZEUGEN</button>
+    <button class="menu-btn btn-join" onclick="toggleJoin()">BEITRETEN</button>
+  </div>
+  <div id="join-section">
+    <input id="lobby-code" placeholder="LOBBY-CODE" maxlength="6" autocomplete="off">
+    <button class="menu-btn btn-join" style="width:100%; margin-top:10px;" onclick="joinLobby()">JOINEN</button>
+  </div>
+  <button class="menu-btn btn-ai" onclick="toggleAI()">GEGEN COMPUTER</button>
+  <div id="ai-section">
+    <div class="diff-row">
+      <div class="diff-opt" data-diff="easy" onclick="selectDiff('easy')">Leicht</div>
+      <div class="diff-opt selected" data-diff="medium" onclick="selectDiff('medium')">Mittel</div>
+      <div class="diff-opt" data-diff="hard" onclick="selectDiff('hard')">Schwer</div>
+    </div>
+    <button class="menu-btn btn-ai" style="margin-bottom:0" onclick="startAI()">SPIEL STARTEN</button>
+  </div>
+  <button class="menu-btn btn-scoreboard" onclick="window.location.href='scoreboard.html'">BESTENLISTE</button>
+  <button class="menu-btn btn-tutorial" onclick="window.location.href='tutorial.html'">? WIE SPIELT MAN</button>
+  <div id="status"></div>
+  <div class="legal-links">
+    <a href="impressum.html">Impressum</a>
+    <a href="datenschutz.html">Datenschutz</a>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const setStatus = txt => { $('status').textContent = txt; };
+
+const ALLOWED_TEAMS = ['Wirtschaftsinformatik', 'Informatik', 'Sonstiges'];
+const REMEMBER_KEY = 'bb_remember';
+
+function clearRememberedPrefs() {
+  localStorage.removeItem(REMEMBER_KEY);
+  localStorage.removeItem('bb_name');
+  localStorage.removeItem('bb_team');
+  localStorage.removeItem('bb_ai_diff');
+}
+
+function rememberPrefs(nt) {
+  if (!$('remember').checked) {
+    clearRememberedPrefs();
+    return;
+  }
+  localStorage.setItem(REMEMBER_KEY, '1');
+  localStorage.setItem('bb_name', nt.name);
+  localStorage.setItem('bb_team', nt.team);
+  localStorage.setItem('bb_ai_diff', selectedDiff);
+}
+
+function prepareGameSession(nt) {
+  sessionStorage.setItem('bb_game_name', nt.name);
+  sessionStorage.setItem('bb_game_team', nt.team);
+  rememberPrefs(nt);
+}
+
+// Restore preferences only if the user explicitly enabled local persistence.
+const rememberEnabled = localStorage.getItem(REMEMBER_KEY) === '1';
+$('remember').checked = rememberEnabled;
+if (rememberEnabled) {
+  $('username').value = localStorage.getItem('bb_name') || '';
+  const savedTeam = localStorage.getItem('bb_team') || '';
+  if (ALLOWED_TEAMS.includes(savedTeam)) $('team').value = savedTeam;
+}
+$('remember').addEventListener('change', () => {
+  if (!$('remember').checked) clearRememberedPrefs();
+});
+
+// If we came back from game.html with a team-mismatch error in the URL,
+// surface it so the user knows to pick the same team they originally used.
+(function showIncomingError() {
+  const params = new URLSearchParams(location.search);
+  const err = params.get('error');
+  if (err) setStatus(decodeURIComponent(err));
+})();
+
+function getNameTeam() {
+  const name = $('username').value.trim();
+  if (!name) { setStatus('Bitte gib einen Namen ein.'); return null; }
+  if (name.length > 32) { setStatus('Name maximal 32 Zeichen.'); return null; }
+  const team = $('team').value;
+  if (!ALLOWED_TEAMS.includes(team)) { setStatus('Bitte wähle eine Fakultät.'); return null; }
+  return { name, team };
+}
+
+function createLobby() {
+  const nt = getNameTeam();
+  if (!nt) return;
+  prepareGameSession(nt);
+  sessionStorage.removeItem('bb_game_code');
+  sessionStorage.removeItem('bb_game_ai');
+  // Server creates the lobby on the WS connection itself; the page just navigates.
+  window.location.href = 'game.html';
+}
+
+function toggleJoin() {
+  const sec = $('join-section');
+  sec.style.display = (sec.style.display === 'none' || sec.style.display === '') ? 'block' : 'none';
+  if (sec.style.display === 'block') $('lobby-code').focus();
+  // Hide the other expander to avoid stacked panels.
+  if (sec.style.display === 'block') $('ai-section').style.display = 'none';
+}
+
+function joinLobby() {
+  const nt = getNameTeam();
+  if (!nt) return;
+  const code = $('lobby-code').value.trim().toLowerCase();
+  if (!code || code.length < 4) { setStatus('Bitte gib einen Code ein.'); return; }
+  prepareGameSession(nt);
+  sessionStorage.setItem('bb_game_code', code);
+  sessionStorage.removeItem('bb_game_ai');
+  window.location.href = 'game.html';
+}
+
+let selectedDiff = rememberEnabled ? (localStorage.getItem('bb_ai_diff') || 'medium') : 'medium';
+if (!['easy','medium','hard'].includes(selectedDiff)) selectedDiff = 'medium';
+
+function toggleAI() {
+  const sec = $('ai-section');
+  sec.style.display = (sec.style.display === 'none' || sec.style.display === '') ? 'block' : 'none';
+  if (sec.style.display === 'block') $('join-section').style.display = 'none';
+  // Reflect persisted choice
+  selectDiff(selectedDiff, true);
+}
+
+function selectDiff(diff, silent) {
+  if (!['easy','medium','hard'].includes(diff)) return;
+  selectedDiff = diff;
+  if (!silent && $('remember').checked) localStorage.setItem('bb_ai_diff', diff);
+  document.querySelectorAll('#ai-section .diff-opt').forEach(el => {
+    el.classList.toggle('selected', el.dataset.diff === diff);
+  });
+}
+
+function startAI() {
+  const nt = getNameTeam();
+  if (!nt) return;
+  prepareGameSession(nt);
+  sessionStorage.setItem('bb_game_ai', selectedDiff);
+  sessionStorage.removeItem('bb_game_code');
+  window.location.href = 'game.html';
+}
+
+// Submit on Enter
+$('username').addEventListener('keydown', e => { if (e.key === 'Enter') createLobby(); });
+$('lobby-code').addEventListener('keydown', e => { if (e.key === 'Enter') joinLobby(); });
+</script>
+</body>
+</html>
