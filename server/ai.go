@@ -1,3 +1,6 @@
+// Copyright 2026 Jonas Bartel
+// SPDX-License-Identifier: Apache-2.0
+
 package main
 
 // Server-side AI opponent for single-player mode.

@@ -1,3 +1,6 @@
+// Copyright 2026 Jonas Bartel
+// SPDX-License-Identifier: Apache-2.0
+
 package main
 
 // Persistent scoreboard backed by SQLite (pure-Go modernc.org/sqlite driver,

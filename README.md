@@ -161,4 +161,4 @@ are not volume-mounted into the nginx container.
 
 ## License
 
-See [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE) for details.
