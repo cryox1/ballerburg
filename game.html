@@ -263,6 +263,122 @@ select { background: #2a1400; color: #ffd700; border: 2px solid #8b4513; font-fa
 .legal-links { position: fixed; right: 8px; bottom: 6px; z-index: 20; display: flex; gap: 10px; font-size: 0.68rem; }
 .legal-links a { color: #8b6a45; text-decoration: none; }
 .legal-links a:hover { color: #ffcc88; text-decoration: underline; }
+
+/* Mobile HUD overlay — only mounts on small viewports. The toggle button stays
+   pinned on the canvas; tapping it adds body.ui-hidden which collapses the
+   top/bottom chrome and reveals the canvas-overlay HUD. Tablets/desktop never
+   see any of this (media queries below). */
+#mobile-ui-toggle { display: none; }
+#hud-overlay { display: none; }
+@media (max-width: 600px), (max-height: 500px) and (orientation: landscape) {
+  #mobile-ui-toggle {
+    display: flex; position: fixed; top: 8px; right: 8px; z-index: 70;
+    width: 38px; height: 38px; align-items: center; justify-content: center;
+    background: rgba(26,10,0,0.85); border: 2px solid #8b4513; color: #ffd700;
+    font-size: 1.1rem; cursor: pointer; padding: 0; line-height: 1;
+    box-shadow: 0 0 8px rgba(0,0,0,0.6);
+  }
+  #mobile-ui-toggle:hover { background: rgba(60,30,0,0.92); }
+  body.ui-hidden #ui-top, body.ui-hidden #ui-bottom { display: none !important; }
+  body.ui-hidden #hud-overlay {
+    display: block; position: fixed; inset: 0; pointer-events: none; z-index: 55;
+  }
+  body.ui-hidden .legal-links { display: none; }
+  /* In the existing landscape grid, collapse to single column so the canvas
+     takes the whole viewport when chrome is hidden. */
+  body.ui-hidden #wrapper {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: "canvas" !important;
+  }
+}
+/* Recompute viewport reserve when hidden so updateGameWidth() expands canvas. */
+body.ui-hidden { --ui-reserve: 0px; }
+
+#hud-overlay > * { pointer-events: none; }
+#hud-overlay button, #hud-overlay input[type=range] { pointer-events: auto; }
+
+#hud-top-left {
+  position: absolute; top: 8px; left: 8px;
+  display: flex; flex-direction: column; gap: 3px;
+  background: rgba(26,10,0,0.78); border: 2px solid #8b4513;
+  padding: 5px 8px; color: #ffd700; font-size: 0.78rem; line-height: 1.25;
+  text-shadow: 0 0 6px #ff8800; min-width: 0;
+}
+#hud-top-left .hud-row { display: flex; gap: 8px; flex-wrap: wrap; }
+#hud-top-left .hud-stat { white-space: nowrap; font-weight: bold; }
+#hud-top-left .hud-stat.dim { color: #a06030; font-weight: normal; }
+
+#hud-top-center {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 10px; align-items: center;
+  background: rgba(26,10,0,0.78); border: 2px solid #8b4513;
+  padding: 4px 10px; color: #ffd700; font-size: 0.78rem;
+  text-shadow: 0 0 6px #ff8800;
+  /* Sit below the king bubble so they don't overlap. */
+  margin-top: 56px;
+}
+#hud-top-center .hud-label { color: #a06030; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.66rem; margin-right: 3px; }
+
+#hud-msg {
+  position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  background: rgba(26,10,0,0.85); border: 1px solid #aa7733;
+  padding: 4px 10px; color: #ffd700; font-size: 0.8rem;
+  text-shadow: 0 0 6px #ff8800; text-align: center;
+  opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0.2s;
+}
+#hud-msg.active { opacity: 1; visibility: visible; }
+
+#hud-tip {
+  position: absolute; bottom: 8px; left: 8px;
+  max-width: calc(100% - 200px);
+  background: rgba(26,10,0,0.85); border: 2px solid #aa7733;
+  padding: 5px 10px; color: #ffd700; font-size: 0.76rem; line-height: 1.3;
+  text-shadow: 0 0 6px #ff8800;
+  opacity: 0; transition: opacity 0.4s;
+}
+#hud-tip.active { opacity: 1; }
+#hud-tip .hud-tip-badge { color: #ffcc88; font-weight: bold; margin-right: 6px; letter-spacing: 0.05em; }
+
+#hud-bottom-right {
+  position: absolute; bottom: 8px; right: 8px;
+  display: flex; flex-direction: column; gap: 5px; align-items: flex-end;
+  background: rgba(26,10,0,0.82); border: 2px solid #8b4513;
+  padding: 6px 8px;
+}
+#hud-bottom-right .hud-tax-row { display: flex; align-items: center; gap: 6px; width: 100%; }
+#hud-bottom-right .hud-tax-row label { color: #a06030; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; }
+#hud-bottom-right input[type=range] { width: 100px; min-width: 0; }
+#hud-bottom-right .hud-tax-val { color: #ffd700; font-weight: bold; font-size: 0.78rem; min-width: 26px; text-align: right; }
+#hud-bottom-right .hud-btn-row { display: flex; gap: 5px; }
+#hud-bottom-right .hud-icon-btn {
+  font-family: 'Courier New', monospace; font-weight: bold; cursor: pointer;
+  min-width: 44px; min-height: 38px; padding: 4px 8px; font-size: 0.78rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+#hud-bottom-right .hud-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+#hud-done { background: #553300; color: #ffcc88; border: 2px solid #aa7733; }
+#hud-done:hover:not(:disabled) { background: #774400; }
+#hud-market { background: #004466; color: #7fdfff; border: 2px solid #3399cc; }
+#hud-market:hover:not(:disabled) { background: #006688; }
+#hud-surrender { background: #3d0000; color: #ff8888; border: 2px solid #882222; }
+#hud-surrender:hover:not(:disabled) { background: #660000; }
+
+@media (pointer: coarse) {
+  #mobile-ui-toggle { width: 44px; height: 44px; font-size: 1.3rem; }
+  #hud-bottom-right .hud-icon-btn { min-height: 44px; min-width: 50px; }
+  #hud-bottom-right input[type=range] { height: 32px; width: 120px; }
+}
+
+/* Portrait phones: tip would collide with the bottom-right stack, so move it
+   above instead of beside. */
+@media (max-width: 600px) and (orientation: portrait) {
+  #hud-tip { left: 8px; right: 8px; bottom: 130px; max-width: none; }
+  #hud-msg { bottom: 175px; }
+  #hud-bottom-right { left: 8px; right: 8px; align-items: stretch; }
+  #hud-bottom-right .hud-tax-row label { min-width: 0; }
+  #hud-bottom-right input[type=range] { width: auto; flex: 1; }
+}
 </style>
 </head>
 <body>
@@ -343,6 +459,40 @@ select { background: #2a1400; color: #ffd700; border: 2px solid #8b4513; font-fa
       </div>
       <div id="king-bubble"><span id="king-text"></span></div>
     </div>
+    <button id="mobile-ui-toggle" type="button" aria-label="UI ein-/ausblenden" title="UI ein-/ausblenden">&#x25A2;</button>
+    <div id="hud-overlay">
+      <div id="hud-top-left">
+        <div class="hud-row">
+          <span class="hud-stat" id="hud-gold">&#x1F4B0; 0</span>
+          <span class="hud-stat" id="hud-powder">&#x1F4A5; 0</span>
+        </div>
+        <div class="hud-row">
+          <span class="hud-stat" id="hud-ammo">&#x26AB; 0</span>
+          <span class="hud-stat" id="hud-pop">&#x1F465; 0</span>
+        </div>
+        <div class="hud-row">
+          <span class="hud-stat dim" id="hud-wind">&#x1F343; —</span>
+        </div>
+      </div>
+      <div id="hud-top-center">
+        <span><span class="hud-label">Rd</span><span id="hud-round">1</span></span>
+        <span><span class="hud-label">Zug</span><span id="hud-turn">—</span></span>
+      </div>
+      <div id="hud-msg"></div>
+      <div id="hud-tip"><span class="hud-tip-badge">&#x1F4FA; TIPP</span><span id="hud-tip-text"></span></div>
+      <div id="hud-bottom-right">
+        <div class="hud-tax-row">
+          <label>Steuer</label>
+          <input type="range" id="hud-tax" min="0" max="100" value="40">
+          <span class="hud-tax-val" id="hud-tax-val">40</span>
+        </div>
+        <div class="hud-btn-row">
+          <button id="hud-market" type="button" class="hud-icon-btn" onclick="openMarket()" title="Markt">&#x2694;</button>
+          <button id="hud-surrender" type="button" class="hud-icon-btn" onclick="doSurrender()" title="Aufgeben">&#x2620;</button>
+          <button id="hud-done" type="button" class="hud-icon-btn" onclick="doEndTurn()" title="Fertig">FERTIG</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div id="ui-bottom">
     <div id="controls">
@@ -405,7 +555,21 @@ const TOWER_SELL_REFUND = 110;
 const $ = id => document.getElementById(id);
 const canvas = $('canvas');
 const ctx = canvas.getContext('2d');
-const setMsg = txt => { $('message').textContent = txt; };
+const setMsg = txt => {
+  $('message').textContent = txt;
+  // Mirror into the mobile HUD overlay (visible when chrome is hidden).
+  const hm = $('hud-msg');
+  if (hm) {
+    hm.textContent = txt;
+    if (txt) {
+      hm.classList.add('active');
+      clearTimeout(setMsg._t);
+      setMsg._t = setTimeout(() => hm.classList.remove('active'), 3500);
+    } else {
+      hm.classList.remove('active');
+    }
+  }
+};
 
 // ═══ King dialog ════════════════════════════════════════════════════════════
 // A non-blocking speech bubble that pops up on key game events with funny German
@@ -721,8 +885,33 @@ function updateUI() {
   if (typeof refreshCanvasCursor === 'function') refreshCanvasCursor();
 
   checkKingEvents(s);
+  updateHudOverlay(s, myCs, canAct, pending, wTxt);
 
   if (s.winner != null && s.phase === 'gameover') showGameOver();
+}
+
+// Mobile HUD overlay — mirrors data from updateUI() so all gating logic stays
+// single-source-of-truth. The overlay itself only paints when body.ui-hidden
+// is set (CSS), but we keep these values fresh either way so toggling on shows
+// current data instantly.
+function updateHudOverlay(s, myCs, canAct, pending, wTxt) {
+  if (!myCs) return;
+  $('hud-gold').textContent   = '\u{1F4B0} ' + myCs.gold;
+  $('hud-powder').textContent = '\u{1F4A5} ' + myCs.powder;
+  $('hud-ammo').textContent   = '\u{26AB} ' + myCs.ammo;
+  $('hud-pop').textContent    = '\u{1F465} ' + myCs.population;
+  $('hud-wind').textContent   = '\u{1F343} ' + wTxt;
+  $('hud-round').textContent  = s.round;
+  $('hud-turn').textContent   = s.players[s.turn] || `Spieler ${s.turn + 1}`;
+  $('hud-done').disabled       = !canAct || pending > 0;
+  $('hud-market').disabled     = !canAct;
+  $('hud-surrender').disabled  = !canAct;
+  $('hud-tax').disabled        = !canAct;
+  if (myCs.taxrate != null && document.activeElement !== $('hud-tax')) {
+    $('hud-tax').value = myCs.taxrate;
+    $('hud-tax-val').textContent = myCs.taxrate;
+    setSliderFill($('hud-tax'));
+  }
 }
 
 // ═══ Action handlers ═══════════════════════════════════════════════════════
@@ -784,10 +973,19 @@ function setSliderFill(el) {
 }
 $('popup-angle').addEventListener('input', e => { $('popup-angle-val').textContent = e.target.value + '°'; setSliderFill(e.target); });
 $('popup-power').addEventListener('input', e => { $('popup-power-val').textContent = e.target.value; setSliderFill(e.target); });
-$('tax-slider').addEventListener('input', e => { $('tax-val').textContent = e.target.value; setSliderFill(e.target); debouncedTaxSend(); });
+function onTaxInput(val, source) {
+  $('tax-val').textContent = val;
+  $('hud-tax-val').textContent = val;
+  if (source !== 'main')  { $('tax-slider').value = val; setSliderFill($('tax-slider')); }
+  if (source !== 'hud')   { $('hud-tax').value = val;    setSliderFill($('hud-tax')); }
+  debouncedTaxSend();
+}
+$('tax-slider').addEventListener('input', e => { setSliderFill(e.target); onTaxInput(e.target.value, 'main'); });
+$('hud-tax').addEventListener('input',    e => { setSliderFill(e.target); onTaxInput(e.target.value, 'hud'); });
 setSliderFill($('popup-angle'));
 setSliderFill($('popup-power'));
 setSliderFill($('tax-slider'));
+setSliderFill($('hud-tax'));
 
 // Scrolling tips ticker — content inserted twice so the -50% loop is seamless.
 const GAME_TIPS = [
@@ -808,6 +1006,45 @@ const GAME_TIPS = [
   if (!track) return;
   const seq = GAME_TIPS.join('  ★  ') + '  ★  ';
   track.textContent = seq + seq;
+})();
+
+// Mobile UI toggle — hides the top/bottom chrome and reveals the canvas-overlay
+// HUD so phones get the full viewport for the game. State is persisted in
+// localStorage so the user's preference survives reloads.
+(function initMobileUiToggle() {
+  const btn = $('mobile-ui-toggle');
+  if (!btn) return;
+  const applyHidden = (hidden) => {
+    document.body.classList.toggle('ui-hidden', hidden);
+    btn.textContent = hidden ? '\u{25A3}' : '\u{25A2}';
+    btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    if (typeof updateGameWidth === 'function') updateGameWidth();
+  };
+  applyHidden(localStorage.getItem('bb_ui_hidden') === '1');
+  btn.addEventListener('click', () => {
+    const next = !document.body.classList.contains('ui-hidden');
+    localStorage.setItem('bb_ui_hidden', next ? '1' : '0');
+    applyHidden(next);
+  });
+})();
+
+// Rotating floating tip — only animates while the chrome is hidden (otherwise
+// the ticker handles tips). Cycles every ~9 s with a brief fade.
+(function initHudTipRotation() {
+  const wrap = $('hud-tip');
+  const text = $('hud-tip-text');
+  if (!wrap || !text) return;
+  let idx = Math.floor(Math.random() * GAME_TIPS.length);
+  const show = () => {
+    text.textContent = GAME_TIPS[idx % GAME_TIPS.length];
+    wrap.classList.add('active');
+  };
+  show();
+  setInterval(() => {
+    if (!document.body.classList.contains('ui-hidden')) return;
+    wrap.classList.remove('active');
+    setTimeout(() => { idx = (idx + 1) % GAME_TIPS.length; show(); }, 400);
+  }, 9000);
 })();
 
 // ═══ Accurate game-width sizing ══════════════════════════════════════════════
