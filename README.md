@@ -90,6 +90,9 @@ serialised through a channel.
 ## Local Development
 
 ```bash
+# One-time: generate go.sum so the Docker build can verify module hashes.
+(cd server && go mod tidy)
+
 docker compose build
 docker compose up
 # open http://localhost:9080
@@ -104,6 +107,32 @@ cd server
 go run .
 # WebSocket: ws://localhost:9092/ws
 ```
+
+## Configuration
+
+The backend reads these env vars (all optional, but the first two should be
+set in production):
+
+| Variable | Purpose |
+|---|---|
+| `BALLERBURG_ADMIN_TOKEN` | Bearer token for `/api/admin*`. Empty (default) rejects every admin request. Send via `Authorization: Bearer <token>`. |
+| `BALLERBURG_ALLOWED_ORIGINS` | Comma-separated `Origin` allowlist for `/ws` upgrades (e.g. `https://ballern.wut.tf`). Empty (default) permits any origin — convenient for local dev, but leaves the server open to cross-site WebSocket hijacking. |
+| `BALLERBURG_MAX_LOBBIES` | Concurrent lobby cap (default 1000). |
+| `BALLERBURG_DB` | SQLite path (default `/app/data/scoreboard.db`). |
+| `BALLERBURG_BACKEND_BIND` | Docker-compose only: host interface to bind the backend port to. Defaults to `127.0.0.1` (loopback). Override to `0.0.0.0` only if you need direct access from another host. |
+| `BALLERBURG_BACKEND_PORT` / `BALLERBURG_FRONTEND_PORT` | Host ports (defaults 9092 / 9080). |
+
+### Security notes for operators
+
+- Always front the deployment with TLS — the admin token and all game traffic
+  are sent in cleartext on the bare nginx config. The shipped `nginx.conf`
+  has an HSTS line ready to uncomment once a TLS terminator is in front.
+- The admin token sits in `localStorage` on `/admin.html`. Anyone with XSS in
+  the admin domain can exfiltrate it. The bundled CSP and DOM-only rendering
+  in `admin.html` are the first line of defence; rotate the token periodically.
+- Player identity is unauthenticated (anyone who knows a registered name +
+  matching team can play as them). The scoreboard is a leaderboard, not an
+  audit log.
 
 ## Deployment
 

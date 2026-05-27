@@ -15,11 +15,18 @@ services:
     build:
       context: server
       dockerfile: ../Dockerfile.backend
+    # Bind to loopback only — the frontend container talks to the backend
+    # over the internal `ballerburg` docker network, so there is no reason to
+    # publish the API on a public interface. Override BALLERBURG_BACKEND_BIND
+    # to "0.0.0.0" only if you intentionally need to reach the backend from
+    # another host (e.g. running the frontend outside docker).
     ports:
-      - "${BALLERBURG_BACKEND_PORT:-9092}:9092"
+      - "${BALLERBURG_BACKEND_BIND:-127.0.0.1}:${BALLERBURG_BACKEND_PORT:-9092}:9092"
     restart: unless-stopped
     environment:
       - BALLERBURG_ADMIN_TOKEN=${BALLERBURG_ADMIN_TOKEN:-}
+      - BALLERBURG_ALLOWED_ORIGINS=${BALLERBURG_ALLOWED_ORIGINS:-}
+      - BALLERBURG_MAX_LOBBIES=${BALLERBURG_MAX_LOBBIES:-}
     volumes:
       - ballerburg-data:/app/data
     networks:

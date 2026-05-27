@@ -17,9 +17,47 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 )
+
+// nameRE restricts player and team names to a printable, low-risk character
+// set: Unicode letters, digits, ASCII space, dash, underscore, dot. This is
+// defence-in-depth — admin.html escapes for HTML, but a strict allowlist kills
+// whole classes of injection bugs across every consumer of a name.
+var nameRE = regexp.MustCompile(`^[\p{L}\p{N} _.\-]{1,32}$`)
+
+// validateName is the canonical check applied at every entry point that
+// accepts a player or team name from the network.
+func validateName(name string) error {
+	if name == "" {
+		return errors.New("name required")
+	}
+	if !nameRE.MatchString(name) {
+		return errors.New("name must be 1-32 characters (letters, numbers, space, _ . -)")
+	}
+	return nil
+}
+
+// originAllowed enforces the BALLERBURG_ALLOWED_ORIGINS allowlist (if set) to
+// block cross-site WebSocket hijacking. Empty allowlist = permissive (local
+// dev). Production deployments must set the env var.
+func originAllowed(r *http.Request, allowed []string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	o := r.Header.Get("Origin")
+	if o == "" {
+		return false
+	}
+	for _, a := range allowed {
+		if a == o {
+			return true
+		}
+	}
+	return false
+}
 
 var (
 	errLobbyFull    = errors.New("lobby full")
@@ -82,18 +120,26 @@ func (c *Conn) closeWrite() {
 // ─── Server ─────────────────────────────────────────────────────────────────
 
 type Server struct {
-	mgr        *LobbyManager
-	scoreboard *Scoreboard
+	mgr            *LobbyManager
+	scoreboard     *Scoreboard
+	allowedOrigins []string
+	adminToken     string
 }
 
-func newServer(sb *Scoreboard) *Server {
+func newServer(sb *Scoreboard, allowedOrigins []string, adminToken string) *Server {
 	return &Server{
-		mgr:        newLobbyManager(sb),
-		scoreboard: sb,
+		mgr:            newLobbyManager(sb),
+		scoreboard:     sb,
+		allowedOrigins: allowedOrigins,
+		adminToken:     adminToken,
 	}
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
+	if !originAllowed(r, s.allowedOrigins) {
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
 	q := r.URL.Query()
 	name := strings.TrimSpace(q.Get("name"))
 	team := strings.TrimSpace(q.Get("team"))
@@ -101,8 +147,8 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	ai := strings.TrimSpace(q.Get("ai"))
 	ghost := q.Get("ghost") == "1"
 
-	if name == "" || len(name) > 32 {
-		http.Error(w, "name required (max 32 chars)", http.StatusBadRequest)
+	if err := validateName(name); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if s.scoreboard == nil {

@@ -1,15 +1,24 @@
 FROM golang:1.26-alpine AS builder
 WORKDIR /app
-COPY go.mod ./
-COPY go.sum* ./
+# Resolve dependencies against the committed go.sum so module hashes are
+# verified at build time. Run `go mod tidy` locally and commit go.sum when you
+# add or upgrade a dependency.
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
-RUN go mod tidy
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /ballerburg-server .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -trimpath -o /ballerburg-server .
 
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S ballerburg \
+    && adduser  -S -G ballerburg ballerburg \
+    && mkdir -p /app/data \
+    && chown -R ballerburg:ballerburg /app
 WORKDIR /app
-RUN mkdir -p /app/data
-COPY --from=builder /ballerburg-server /app/ballerburg-server
+COPY --from=builder --chown=ballerburg:ballerburg /ballerburg-server /app/ballerburg-server
+# Existing deployments with a pre-existing ballerburg-data volume owned by
+# root will need a one-time `chown -R ballerburg:ballerburg /app/data` inside
+# the container before this image will boot.
+USER ballerburg
 EXPOSE 9092
 CMD ["/app/ballerburg-server"]

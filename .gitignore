@@ -1,6 +1,5 @@
 server/ballerburg-server
 server/ballerburg-server.exe
-server/go.sum
 .claude/
 .opencode/
 skills/

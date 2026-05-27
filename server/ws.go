@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // Minimal websocket implementation — zero dependencies.
@@ -25,6 +26,12 @@ const (
 	WS_OP_PING  = 9
 	WS_OP_PONG  = 10
 )
+
+// maxFrameSize caps incoming WebSocket payloads. Game commands are tiny JSON
+// envelopes (fire angle/power, buy item id, etc.) — a few hundred bytes at
+// most. Without this cap an attacker can announce a 2 GiB length and trigger
+// a per-connection OOM allocation.
+const maxFrameSize = 4096
 
 type WSConn struct {
 	conn io.ReadWriteCloser
@@ -87,7 +94,14 @@ func (c *WSConn) ReadMessage() (int, []byte, error) {
 		if err != nil {
 			return 0, nil, err
 		}
-		Len = int(binary.BigEndian.Uint64(ext))
+		u := binary.BigEndian.Uint64(ext)
+		if u > maxFrameSize {
+			return 0, nil, fmt.Errorf("frame too large: %d bytes", u)
+		}
+		Len = int(u)
+	}
+	if Len > maxFrameSize {
+		return 0, nil, fmt.Errorf("frame too large: %d bytes", Len)
 	}
 
 	maskKey := make([]byte, 4)
@@ -145,6 +159,11 @@ func UpgradeHTTP(conn http.ResponseWriter, r *http.Request) (*WSConn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("hijack failed: %w", err)
 	}
+
+	// http.Server's ReadTimeout/WriteTimeout still apply to the hijacked
+	// connection. WebSockets are long-lived, so clear the deadlines and let
+	// the read/write loops manage their own.
+	_ = rawConn.SetDeadline(time.Time{})
 
 	// Send 101 Switching Protocols
 	resp := "HTTP/1.1 101 Switching Protocols\r\n" +

@@ -17,9 +17,16 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
+
+// defaultMaxLobbies caps the number of concurrent lobbies the manager will
+// hold. Without a cap an unauthenticated attacker can fill the map with
+// 2-hour-lived lobbies (one per WS upgrade) until the process OOMs.
+const defaultMaxLobbies = 1000
 
 // inboundCmd is what WS readers push onto Lobby.cmds.
 type inboundCmd struct {
@@ -584,14 +591,22 @@ type LobbyManager struct {
 	lobbies map[string]*Lobby
 
 	scoreboard *Scoreboard
+	maxLobbies int
 
 	gcDone chan struct{}
 }
 
 func newLobbyManager(sb *Scoreboard) *LobbyManager {
+	max := defaultMaxLobbies
+	if v := os.Getenv("BALLERBURG_MAX_LOBBIES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			max = n
+		}
+	}
 	m := &LobbyManager{
 		lobbies:    make(map[string]*Lobby),
 		scoreboard: sb,
+		maxLobbies: max,
 		gcDone:     make(chan struct{}),
 	}
 	go m.gc()
@@ -601,6 +616,9 @@ func newLobbyManager(sb *Scoreboard) *LobbyManager {
 func (m *LobbyManager) Create(hostName, hostTeam string, ghost bool) *Lobby {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if len(m.lobbies) >= m.maxLobbies {
+		return nil
+	}
 	// Generate a code that doesn't clash
 	for tries := 0; tries < 50; tries++ {
 		code := genCode()
@@ -618,6 +636,9 @@ func (m *LobbyManager) Create(hostName, hostTeam string, ghost bool) *Lobby {
 func (m *LobbyManager) CreateAI(hostName, hostTeam, diff string, ghost bool) *Lobby {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if len(m.lobbies) >= m.maxLobbies {
+		return nil
+	}
 	for tries := 0; tries < 50; tries++ {
 		code := genCode()
 		if _, exists := m.lobbies[code]; !exists {
