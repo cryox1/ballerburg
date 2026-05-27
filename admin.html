@@ -51,13 +51,13 @@
   <h2>Ballerburg Admin</h2>
   <p>Enter your admin token to continue.</p>
   <input id="tok" type="password" placeholder="Admin token" autocomplete="current-password">
-  <button onclick="saveToken()">Enter</button>
+  <button id="login-btn">Enter</button>
   <div id="login-err"></div>
 </div>
 
 <div id="dashboard" style="display:none">
   <h1>&#9876; Ballerburg &mdash; Admin Dashboard</h1>
-  <div id="status"><span class="dot"></span><span id="status-text">Loading&hellip;</span><span id="logout" onclick="logout()">Log out</span></div>
+  <div id="status"><span class="dot"></span><span id="status-text">Loading&hellip;</span><span id="logout">Log out</span></div>
 
   <div class="cards" id="cards"></div>
 
@@ -91,7 +91,7 @@
              style="flex:1;min-width:160px;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:6px 10px;color:#c9d1d9;font-family:inherit;font-size:0.85rem;outline:none">
       <input id="new-team-sort" type="number" value="0" title="Sort order"
              style="width:80px;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:6px 10px;color:#c9d1d9;font-family:inherit;font-size:0.85rem;outline:none">
-      <button onclick="addTeam()"
+      <button id="add-team-btn"
               style="background:#238636;border:none;border-radius:4px;color:#fff;padding:6px 16px;cursor:pointer;font-family:inherit;font-size:0.85rem">Hinzufügen</button>
     </div>
     <div id="teams-err" style="color:#f85149;margin-top:8px;font-size:0.78rem;min-height:1em"></div>
@@ -105,8 +105,48 @@
 </div>
 
 <script>
+// Untrusted strings (player/team names) are inserted via textContent or as
+// option values via the DOM API — never as raw HTML. Inline event handlers
+// are intentionally not used; everything wires through addEventListener.
+
 let tok = '';
 let timer = null;
+
+// el(tag, attrs, ...children) — minimal createElement wrapper. Attributes are
+// set as element properties for inputs/values (so the values aren't
+// HTML-parsed) and as plain attributes otherwise; event handlers (`on…` keys
+// whose value is a function) are bound with addEventListener. Children may be
+// nodes or primitives — primitives are wrapped in text nodes, which is
+// what makes this safe against XSS.
+function el(tag, attrs, ...children) {
+  const e = document.createElement(tag);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') e.className = v;
+      else if (k === 'style') e.setAttribute('style', v);
+      else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+      else if (k === 'value' || k === 'checked' || k === 'disabled') e[k] = v;
+      else e.setAttribute(k, v);
+    }
+  }
+  for (const c of children) {
+    if (c == null || c === false) continue;
+    if (c instanceof Node) e.appendChild(c);
+    else e.appendChild(document.createTextNode(String(c)));
+  }
+  return e;
+}
+
+function clear(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+function authHeaders(extra) {
+  const h = { Authorization: 'Bearer ' + tok };
+  if (extra) Object.assign(h, extra);
+  return h;
+}
 
 function init() {
   tok = localStorage.getItem('bb_tok') || '';
@@ -116,6 +156,12 @@ function init() {
     localStorage.setItem('bb_tok', tok);
     history.replaceState(null, '', location.pathname);
   }
+
+  document.getElementById('login-btn').addEventListener('click', saveToken);
+  document.getElementById('tok').addEventListener('keydown', e => { if (e.key === 'Enter') saveToken(); });
+  document.getElementById('logout').addEventListener('click', logout);
+  document.getElementById('add-team-btn').addEventListener('click', addTeam);
+
   if (tok) showDash(); else showLogin();
 }
 
@@ -139,8 +185,6 @@ function saveToken() {
   showDash();
 }
 
-document.getElementById('tok').addEventListener('keydown', e => { if (e.key === 'Enter') saveToken(); });
-
 function logout() {
   clearInterval(timer);
   tok = '';
@@ -150,8 +194,7 @@ function logout() {
 
 async function load() {
   try {
-    const url = '/api/admin' + (tok ? '?token=' + encodeURIComponent(tok) : '');
-    const r = await fetch(url, { cache: 'no-store' });
+    const r = await fetch('/api/admin', { cache: 'no-store', headers: authHeaders() });
     if (r.status === 401) {
       clearInterval(timer);
       document.getElementById('login-err').textContent = 'Invalid token.';
@@ -166,6 +209,15 @@ async function load() {
   }
 }
 
+const SORT_INPUT_STYLE = 'width:60px;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:3px 6px;color:#c9d1d9;font-family:inherit;font-size:0.82rem;outline:none';
+const SELECT_STYLE = 'background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:3px 6px;color:#c9d1d9;font-family:inherit;font-size:0.82rem;outline:none';
+
+function emptyRow(cols, msg) {
+  return el('tr', null,
+    el('td', { colspan: cols, style: 'color:#8b949e;padding:12px 8px' }, msg)
+  );
+}
+
 function render(d) {
   const lv = d.live || {};
 
@@ -176,9 +228,15 @@ function render(d) {
     { label: 'Sessions Today',    value: d.sessions_today ?? 0,   sub: (d.sessions_week ?? 0) + ' this week · ' + (d.sessions_total ?? 0) + ' total' },
     { label: 'Matches Today',     value: d.matches_today ?? 0,    sub: (d.matches_week ?? 0) + ' this week · ' + (d.matches_total ?? 0) + ' total' },
   ];
-  document.getElementById('cards').innerHTML = cards.map(c =>
-    '<div class="card"><div class="card-label">' + esc(c.label) + '</div><div class="card-value">' + esc(String(c.value)) + '</div><div class="card-sub">' + esc(String(c.sub)) + '</div></div>'
-  ).join('');
+  const cardsHost = document.getElementById('cards');
+  clear(cardsHost);
+  for (const c of cards) {
+    cardsHost.appendChild(el('div', { class: 'card' },
+      el('div', { class: 'card-label' }, c.label),
+      el('div', { class: 'card-value' }, String(c.value)),
+      el('div', { class: 'card-sub' }, c.sub),
+    ));
+  }
 
   // Charts
   drawBars('chart-hourly',
@@ -196,86 +254,120 @@ function render(d) {
   // Game type table
   const gt = d.game_type_breakdown || {};
   const gtRows = Object.entries(gt).sort((a,b) => b[1]-a[1]);
-  document.getElementById('tbl-gt').innerHTML =
-    '<tr><th>Type</th><th>Sessions</th></tr>' +
-    (gtRows.length
-      ? gtRows.map(([k,v]) => '<tr><td>' + esc(k) + '</td><td>' + v + '</td></tr>').join('')
-      : '<tr><td colspan="2" style="color:#8b949e;padding:12px 8px">No sessions recorded yet</td></tr>');
+  const gtTbl = document.getElementById('tbl-gt');
+  clear(gtTbl);
+  gtTbl.appendChild(el('tr', null, el('th', null, 'Type'), el('th', null, 'Sessions')));
+  if (gtRows.length === 0) {
+    gtTbl.appendChild(emptyRow(2, 'No sessions recorded yet'));
+  } else {
+    for (const [k, v] of gtRows) {
+      gtTbl.appendChild(el('tr', null, el('td', null, k), el('td', null, String(v))));
+    }
+  }
 
   // Top players table
   const tp = d.top_players_by_sessions || [];
-  document.getElementById('tbl-top').innerHTML =
-    '<tr><th>#</th><th>Player</th><th>Sessions</th></tr>' +
-    (tp.length
-      ? tp.map((p,i) => '<tr><td>' + (i+1) + '</td><td>' + esc(p.name) + '</td><td>' + p.count + '</td></tr>').join('')
-      : '<tr><td colspan="3" style="color:#8b949e;padding:12px 8px">No sessions recorded yet</td></tr>');
+  const topTbl = document.getElementById('tbl-top');
+  clear(topTbl);
+  topTbl.appendChild(el('tr', null, el('th', null, '#'), el('th', null, 'Player'), el('th', null, 'Sessions')));
+  if (tp.length === 0) {
+    topTbl.appendChild(emptyRow(3, 'No sessions recorded yet'));
+  } else {
+    tp.forEach((p, i) => {
+      topTbl.appendChild(el('tr', null,
+        el('td', null, String(i + 1)),
+        el('td', null, p.name),
+        el('td', null, String(p.count)),
+      ));
+    });
+  }
 
   // Teams table — sort cell is an inline editable input; commits on Enter or blur.
   const teams = d.teams || [];
-  const inputStyle = 'width:60px;background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:3px 6px;color:#c9d1d9;font-family:inherit;font-size:0.82rem;outline:none';
-  document.getElementById('tbl-teams').innerHTML =
-    '<tr><th>Name</th><th style="width:90px">Sort</th><th style="width:200px">Aktion</th></tr>' +
-    (teams.length
-      ? teams.map(t => {
-          const nm = esc(t.name);
-          const nmAttr = nm.replace(/"/g, '&quot;');
-          return '<tr>' +
-            '<td>' + nm + '</td>' +
-            '<td><input type="number" value="' + t.sort_order + '" data-team="' + nmAttr + '" data-orig="' + t.sort_order + '"' +
-              ' onchange="saveSort(this)" onkeydown="if(event.key===\'Enter\'){this.blur();}"' +
-              ' style="' + inputStyle + '"></td>' +
-            '<td>' +
-              '<a href="#" onclick="renameTeam(\'' + nmAttr + '\');return false" style="color:#58a6ff;margin-right:10px">Umbenennen</a>' +
-              '<a href="#" onclick="deleteTeam(\'' + nmAttr + '\');return false" style="color:#f85149">Löschen</a>' +
-            '</td>' +
-          '</tr>';
-        }).join('')
-      : '<tr><td colspan="3" style="color:#8b949e;padding:12px 8px">Keine Teams</td></tr>');
+  const teamsTbl = document.getElementById('tbl-teams');
+  clear(teamsTbl);
+  teamsTbl.appendChild(el('tr', null,
+    el('th', null, 'Name'),
+    el('th', { style: 'width:90px' }, 'Sort'),
+    el('th', { style: 'width:200px' }, 'Aktion'),
+  ));
+  if (teams.length === 0) {
+    teamsTbl.appendChild(emptyRow(3, 'Keine Teams'));
+  } else {
+    for (const t of teams) {
+      const sortInput = el('input', {
+        type: 'number',
+        value: String(t.sort_order),
+        style: SORT_INPUT_STYLE,
+        onchange: () => saveSort(t.name, t.sort_order, sortInput),
+        onkeydown: e => { if (e.key === 'Enter') sortInput.blur(); },
+      });
+      const renameLink = el('a', { href: '#', style: 'color:#58a6ff;margin-right:10px',
+        onclick: e => { e.preventDefault(); renameTeam(t.name); } }, 'Umbenennen');
+      const deleteLink = el('a', { href: '#', style: 'color:#f85149',
+        onclick: e => { e.preventDefault(); deleteTeam(t.name); } }, 'Löschen');
+      teamsTbl.appendChild(el('tr', null,
+        el('td', null, t.name),
+        el('td', null, sortInput),
+        el('td', null, renameLink, deleteLink),
+      ));
+    }
+  }
 
   // Players table — team is a dropdown that commits on change.
   const players = d.players || [];
-  const selectStyle = 'background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:3px 6px;color:#c9d1d9;font-family:inherit;font-size:0.82rem;outline:none';
-  const teamOptions = teams.map(t => {
-    const tn = esc(t.name);
-    const tnAttr = tn.replace(/"/g, '&quot;');
-    return '<option value="' + tnAttr + '">' + tn + '</option>';
-  }).join('');
-  document.getElementById('tbl-players').innerHTML =
-    '<tr><th>Name</th><th style="width:200px">Team</th><th style="width:50px">W</th><th style="width:50px">L</th><th style="width:150px">Letztes Spiel</th><th style="width:200px">Aktion</th></tr>' +
-    (players.length
-      ? players.map(p => {
-          const nm = esc(p.name);
-          const nmAttr = nm.replace(/"/g, '&quot;');
-          const teamAttr = esc(p.team).replace(/"/g, '&quot;');
-          const last = p.last_played ? esc(p.last_played.slice(0, 16).replace('T', ' ')) : '<span style="color:#8b949e">—</span>';
-          const teamKnown = teams.some(t => t.name === p.team);
-          const driftOpt = teamKnown ? '' : '<option value="' + teamAttr + '">' + esc(p.team) + ' (?)</option>';
-          return '<tr>' +
-            '<td>' + nm + '</td>' +
-            '<td><select data-player="' + nmAttr + '" data-orig="' + teamAttr + '" onchange="savePlayerTeam(this)" style="' + selectStyle + '">' + driftOpt + teamOptions + '</select></td>' +
-            '<td>' + p.wins + '</td>' +
-            '<td>' + p.losses + '</td>' +
-            '<td>' + last + '</td>' +
-            '<td>' +
-              '<a href="#" onclick="renamePlayer(\'' + nmAttr + '\');return false" style="color:#58a6ff;margin-right:10px">Umbenennen</a>' +
-              '<a href="#" onclick="deletePlayer(\'' + nmAttr + '\');return false" style="color:#f85149">Löschen</a>' +
-            '</td>' +
-          '</tr>';
-        }).join('')
-      : '<tr><td colspan="6" style="color:#8b949e;padding:12px 8px">Keine Spieler</td></tr>');
+  const playersTbl = document.getElementById('tbl-players');
+  clear(playersTbl);
+  playersTbl.appendChild(el('tr', null,
+    el('th', null, 'Name'),
+    el('th', { style: 'width:200px' }, 'Team'),
+    el('th', { style: 'width:50px' }, 'W'),
+    el('th', { style: 'width:50px' }, 'L'),
+    el('th', { style: 'width:150px' }, 'Letztes Spiel'),
+    el('th', { style: 'width:200px' }, 'Aktion'),
+  ));
+  if (players.length === 0) {
+    playersTbl.appendChild(emptyRow(6, 'Keine Spieler'));
+  } else {
+    for (const p of players) {
+      const teamKnown = teams.some(t => t.name === p.team);
+      const select = el('select', {
+        style: SELECT_STYLE,
+        onchange: () => savePlayerTeam(p.name, p.team, select),
+      });
+      if (!teamKnown) {
+        select.appendChild(el('option', { value: p.team }, p.team + ' (?)'));
+      }
+      for (const t of teams) {
+        select.appendChild(el('option', { value: t.name }, t.name));
+      }
+      select.value = p.team;
 
-  // Set each select's value after insertion (so unknown-team drift shows blank rather than the wrong team).
-  document.querySelectorAll('#tbl-players select[data-player]').forEach(sel => {
-    sel.value = sel.getAttribute('data-orig');
-  });
+      const lastNode = p.last_played
+        ? document.createTextNode(p.last_played.slice(0, 16).replace('T', ' '))
+        : el('span', { style: 'color:#8b949e' }, '—');
+
+      const renameLink = el('a', { href: '#', style: 'color:#58a6ff;margin-right:10px',
+        onclick: e => { e.preventDefault(); renamePlayer(p.name); } }, 'Umbenennen');
+      const deleteLink = el('a', { href: '#', style: 'color:#f85149',
+        onclick: e => { e.preventDefault(); deletePlayer(p.name); } }, 'Löschen');
+
+      playersTbl.appendChild(el('tr', null,
+        el('td', null, p.name),
+        el('td', null, select),
+        el('td', null, String(p.wins)),
+        el('td', null, String(p.losses)),
+        el('td', null, lastNode),
+        el('td', null, renameLink, deleteLink),
+      ));
+    }
+  }
 }
 
-function saveSort(el) {
-  const name = el.getAttribute('data-team');
-  const orig = parseInt(el.getAttribute('data-orig'), 10);
-  const next = parseInt(el.value, 10);
+function saveSort(name, orig, inputEl) {
+  const next = parseInt(inputEl.value, 10);
   if (isNaN(next) || next === orig) {
-    el.value = orig;
+    inputEl.value = orig;
     return;
   }
   teamsMutate('PATCH', { old_name: name, sort_order: next });
@@ -288,10 +380,9 @@ function teamsErr(msg) {
 async function teamsMutate(method, body) {
   teamsErr('');
   try {
-    const url = '/api/admin/teams' + (tok ? '?token=' + encodeURIComponent(tok) : '');
-    const r = await fetch(url, {
+    const r = await fetch('/api/admin/teams', {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     });
     if (!r.ok) {
@@ -342,10 +433,9 @@ function playersErr(msg) {
 async function playersMutate(method, body) {
   playersErr('');
   try {
-    const url = '/api/admin/players' + (tok ? '?token=' + encodeURIComponent(tok) : '');
-    const r = await fetch(url, {
+    const r = await fetch('/api/admin/players', {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     });
     if (!r.ok) {
@@ -365,10 +455,8 @@ async function playersMutate(method, body) {
   }
 }
 
-function savePlayerTeam(el) {
-  const name = el.getAttribute('data-player');
-  const orig = el.getAttribute('data-orig');
-  const next = el.value;
+function savePlayerTeam(name, orig, selectEl) {
+  const next = selectEl.value;
   if (next === orig) return;
   playersMutate('PATCH', { old_name: name, team: next });
 }
@@ -384,10 +472,6 @@ function renamePlayer(oldName) {
 function deletePlayer(name) {
   if (!confirm('Spieler "' + name + '" wirklich löschen?\nAlle Spiele, Sessions und KI-Partien werden ebenfalls entfernt.')) return;
   playersMutate('DELETE', { name });
-}
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function drawBars(id, labels, values, color, h) {

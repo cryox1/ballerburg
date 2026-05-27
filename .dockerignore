@@ -1,0 +1,24 @@
+# Build artifacts
+server/ballerburg-server
+server/ballerburg-server.exe
+
+# Tests are not needed in the runtime image
+tests/
+**/*_test.go
+
+# VCS and tool state
+.git/
+.gitignore
+.gitattributes
+.claude/
+.opencode/
+skills/
+
+# Secrets
+.env
+.env.*
+
+# Worktree / IDE clutter
+.vscode/
+.idea/
+*.swp

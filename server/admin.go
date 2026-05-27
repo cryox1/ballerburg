@@ -4,14 +4,29 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
+
+// adminAuthorized validates the Authorization header against the configured
+// admin token using a constant-time comparison. An empty configured token
+// rejects every request — admin endpoints fail closed.
+func (s *Server) adminAuthorized(r *http.Request) bool {
+	if s.adminToken == "" {
+		return false
+	}
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		return false
+	}
+	provided := strings.TrimPrefix(auth, "Bearer ")
+	return subtle.ConstantTimeCompare([]byte(provided), []byte(s.adminToken)) == 1
+}
 
 // LiveStats holds in-memory counts from the LobbyManager.
 type LiveStats struct {
@@ -75,8 +90,7 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := os.Getenv("BALLERBURG_ADMIN_TOKEN")
-	if token == "" || r.URL.Query().Get("token") != token {
+	if !s.adminAuthorized(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -133,15 +147,13 @@ type teamRequest struct {
 	SortOrder *int   `json:"sort_order,omitempty"`
 }
 
-// validateTeamName trims and length-checks an incoming team name. Returns the
-// cleaned value or an error suitable for an HTTP 400 response.
+// validateTeamName trims, allowlist-checks, and length-checks an incoming
+// team name. Returns the cleaned value or an error suitable for an HTTP 400
+// response.
 func validateTeamName(name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return "", errors.New("name required")
-	}
-	if len(name) > 32 {
-		return "", errors.New("name too long (max 32 chars)")
+	if err := validateName(name); err != nil {
+		return "", err
 	}
 	return name, nil
 }
@@ -149,8 +161,7 @@ func validateTeamName(name string) (string, error) {
 // handleAdminTeams handles POST/PATCH/DELETE on /api/admin/teams. Same token
 // gate as /api/admin.
 func (s *Server) handleAdminTeams(w http.ResponseWriter, r *http.Request) {
-	token := os.Getenv("BALLERBURG_ADMIN_TOKEN")
-	if token == "" || r.URL.Query().Get("token") != token {
+	if !s.adminAuthorized(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -258,8 +269,7 @@ type playerRequest struct {
 // gate as /api/admin. No POST — player rows are created by completed matches,
 // not by the admin.
 func (s *Server) handleAdminPlayers(w http.ResponseWriter, r *http.Request) {
-	token := os.Getenv("BALLERBURG_ADMIN_TOKEN")
-	if token == "" || r.URL.Query().Get("token") != token {
+	if !s.adminAuthorized(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -325,14 +335,12 @@ func (s *Server) handleAdminPlayers(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "players": players})
 }
 
-// validatePlayerName matches the cap enforced by wshandler.go on incoming names.
+// validatePlayerName matches the allowlist enforced by wshandler.go on
+// incoming names.
 func validatePlayerName(name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return "", errors.New("name required")
-	}
-	if len(name) > 32 {
-		return "", errors.New("name too long (max 32 chars)")
+	if err := validateName(name); err != nil {
+		return "", err
 	}
 	return name, nil
 }
